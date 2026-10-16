@@ -158,21 +158,6 @@ impl Store {
         self.commit();
     }
 
-    /// Finds a vehicle by name or creates it.
-    pub fn vehicle_by_name(&self, name: &str) -> String {
-        let name = name.trim();
-        if name.is_empty() {
-            return self.active_vehicle();
-        }
-        let found = self.data.with_untracked(|d| {
-            d.vehicles
-                .iter()
-                .find(|v| !v.deleted && v.name.eq_ignore_ascii_case(name))
-                .map(|v| v.id.clone())
-        });
-        found.unwrap_or_else(|| self.add_vehicle(name))
-    }
-
     /// Merges records/vehicles from elsewhere; local edits count as changes.
     pub fn import(&self, other: &AppData) -> usize {
         let mut changed = 0;

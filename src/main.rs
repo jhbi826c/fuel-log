@@ -1,6 +1,5 @@
 mod app;
 mod charts;
-mod csv;
 mod format;
 mod i18n;
 mod model;

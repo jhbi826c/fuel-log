@@ -6,7 +6,7 @@ use crate::app::{Ui, run_sync};
 use crate::i18n::{Lang, fill};
 use crate::model::{AppData, MapProvider};
 use crate::store::Store;
-use crate::{csv, format, web};
+use crate::{format, web};
 
 const TOKEN_URL: &str = "https://github.com/settings/tokens/new?scopes=gist&description=Fuel%20Log";
 const CURRENCIES: [&str; 9] = ["€", "Kč", "zł", "CHF", "£", "$", "¥", "Ft", "kr"];
@@ -50,41 +50,6 @@ pub fn SettingsView() -> impl IntoView {
                 }
                 Err(e) => ui.error(format!("{} ({e})", t.import_failed)),
             }
-        });
-    };
-
-    let export_csv = move |_| {
-        let entries: Vec<(String, crate::stats::Entry)> = store
-            .vehicles()
-            .into_iter()
-            .flat_map(|v| store.entries_for(&v.id).into_iter().map(move |e| (v.name.clone(), e)))
-            .collect();
-        let refs: Vec<(String, &crate::stats::Entry)> = entries.iter().map(|(n, e)| (n.clone(), e)).collect();
-        web::download(&format!("fuel-log-{}.csv", today()), &csv::export(&refs), "text/csv;charset=utf-8");
-    };
-
-    let import_csv = move |ev: leptos::ev::Event| {
-        let Some(file) = picked_file(&ev) else { return };
-        spawn_local(async move {
-            let t = store.t();
-            let text = match web::read_file(file).await {
-                Ok(text) => text,
-                Err(e) => return ui.error(format!("{} ({e})", t.import_failed)),
-            };
-            let (rows, skipped) = csv::to_records(&csv::parse(&text), &mut web::new_id);
-            let now = web::now_ms();
-            let records = rows
-                .into_iter()
-                .map(|imp| {
-                    let mut r = imp.rec;
-                    r.vehicle_id = store.vehicle_by_name(&imp.vehicle);
-                    r.created_at = now;
-                    r.updated_at = now;
-                    r
-                })
-                .collect::<Vec<_>>();
-            let n = store.import(&AppData { version: 1, vehicles: Vec::new(), records });
-            ui.toast(fill(t.csv_imported, &[("n", &n), ("skipped", &skipped)]));
         });
     };
 
@@ -366,13 +331,6 @@ pub fn SettingsView() -> impl IntoView {
                         {t.import_json}
                         <input type="file" accept=".json,application/json" hidden on:change=import_json />
                     </label>
-                    <button class="btn" on:click=export_csv>
-                        {t.export_csv}
-                    </button>
-                    <label class="btn">
-                        {t.import_csv}
-                        <input type="file" accept=".csv,text/csv,text/plain" hidden on:change=import_csv />
-                    </label>
                     {has_demo.then(|| view! {
                         <button class="btn" on:click=remove_demo>
                             {t.remove_demo}
@@ -382,7 +340,7 @@ pub fn SettingsView() -> impl IntoView {
                         {t.delete_all}
                     </button>
                 </div>
-                <p class="hint">{t.csv_hint}</p>
+                <p class="hint">{t.backup_hint}</p>
                 <p class="hint">{t.storage_note}</p>
             </section>
             <section class="card about">

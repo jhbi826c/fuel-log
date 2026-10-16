@@ -21,7 +21,7 @@ UI languages: English, 中文, Deutsch.
 - **Data**:
   - Stored locally in the browser.
   - Optional sync across devices through a private GitHub Gist.
-  - JSON backup export and import; CSV export and import.
+  - Backup export and import as a JSON file.
 - **PWA**: can be added to the home screen and works offline.
 
 ## Development
