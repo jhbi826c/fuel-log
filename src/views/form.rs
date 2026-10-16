@@ -3,11 +3,14 @@ use std::collections::HashMap;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 
+use super::prices::{local_price, station_title};
 use super::{Icon, icon};
 use crate::app::Ui;
 use crate::format::{self, input_num, money, num, parse_num};
 use crate::i18n::fill;
-use crate::model::Record;
+use crate::model::{FuelKind, Record};
+use crate::places::geo::distance_km;
+use crate::places::{self, Query, Station, sort_stations};
 use crate::stats::{SegState, analyze, parse_dt, sort_records};
 use crate::store::Store;
 use crate::web;
@@ -19,7 +22,8 @@ enum Trio {
     Total,
 }
 
-const STATION_MATCH_METERS: f64 = 300.0;
+const KNOWN_STATION_KM: f64 = 0.15;
+const NEARBY_KM: f64 = 2.0;
 
 /// Distinct non-empty values, most frequent first.
 fn by_frequency<'a>(values: impl Iterator<Item = &'a str>) -> Vec<String> {
@@ -217,6 +221,35 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         }
     };
 
+    let nearby = RwSignal::new(None::<Vec<Station>>);
+    let search_kind = move || {
+        FuelKind::from_name(&fuel.get_untracked()).unwrap_or_else(|| store.settings.with_untracked(|s| s.search_fuel))
+    };
+
+    let apply_station = move |st: &Station, kind: FuelKind| {
+        let label = st.label();
+        station.set(if label.is_empty() { store.t().unnamed_station.to_string() } else { label });
+        if !st.address.is_empty() {
+            address.set(st.address.clone());
+        }
+        coords.set(Some((st.lat, st.lng)));
+        if fuel.get_untracked().trim().is_empty() {
+            fuel.set(kind.name().to_string());
+        }
+        if price.get_untracked().trim().is_empty()
+            && let Some(p) = st.price(kind).and_then(|p| store.convert_eur(p))
+        {
+            on_trio(Trio::Price, input_num(l, p, 3));
+        }
+        nearby.set(None);
+    };
+
+    if !editing && let Some(p) = ui.prefill.get_untracked() {
+        ui.prefill.set(None);
+        fuel.set(p.fuel.name().to_string());
+        apply_station(&p.station, p.fuel);
+    }
+
     let locate = {
         let all = all.clone();
         move |_| {
@@ -224,30 +257,91 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             let all = all.clone();
             spawn_local(async move {
                 let t = store.t();
-                match web::geolocate().await {
-                    Ok(c) => {
-                        coords.set(Some(c));
-                        let nearest = all
-                            .iter()
-                            .filter(|r| !r.station.is_empty())
-                            .filter_map(|r| Some((web::haversine(c, r.coords()?), r)))
-                            .filter(|(d, _)| *d < STATION_MATCH_METERS)
-                            .min_by(|a, b| a.0.total_cmp(&b.0));
-                        if let Some((_, r)) = nearest
-                            && station.get_untracked().is_empty()
-                        {
-                            station.set(r.station.clone());
-                            if address.get_untracked().is_empty() {
-                                address.set(r.address.clone());
-                            }
-                            ui.toast(fill(t.station_recognized, &[("name", &r.station)]));
-                        }
+                let c = match web::geolocate().await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        ui.error(format!("{} ({e})", t.locate_failed));
+                        locating.set(false);
+                        return;
                     }
-                    Err(e) => ui.error(format!("{} ({e})", t.locate_failed)),
+                };
+                coords.set(Some(c));
+                store.refresh_rates();
+                let query = Query {
+                    lat: c.0,
+                    lng: c.1,
+                    radius_km: NEARBY_KM,
+                    fuel: search_kind(),
+                    tankerkoenig_key: store.settings.with_untracked(|s| s.tankerkoenig_key.clone()),
+                };
+                let (addr, found) = futures::join!(places::reverse_geocode(c), places::search(query));
+                if address.get_untracked().is_empty()
+                    && let Ok(Some(a)) = addr
+                {
+                    address.set(a);
                 }
+                let known = all
+                    .iter()
+                    .filter(|r| !r.station.is_empty())
+                    .filter_map(|r| Some((distance_km(c, r.coords()?), r)))
+                    .filter(|(d, _)| *d < KNOWN_STATION_KM)
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                if let Some((_, r)) = known
+                    && station.get_untracked().is_empty()
+                {
+                    station.set(r.station.clone());
+                    if !r.address.is_empty() {
+                        address.set(r.address.clone());
+                    }
+                    ui.toast(fill(t.station_recognized, &[("name", &r.station)]));
+                }
+                let mut list = found.stations;
+                sort_stations(&mut list, FuelKind::E10, false);
+                list.truncate(8);
+                nearby.set(Some(list));
                 locating.set(false);
             });
         }
+    };
+
+    let picker = move || {
+        let list = nearby.get()?;
+        let t = store.t();
+        if list.is_empty() {
+            return Some(view! { <p class="hint">{t.no_nearby}</p> }.into_any());
+        }
+        let kind = search_kind();
+        Some(
+            view! {
+                <div class="picker">
+                    <p class="hint">{t.pick_station}</p>
+                    {list
+                        .into_iter()
+                        .map(|st| {
+                            let price = st.price(kind).map(|p| local_price(store, p).0);
+                            let dist = format!("{} km", num(l, st.dist_km, 1));
+                            let pick = st.clone();
+                            view! {
+                                <button type="button" class="pick" on:click=move |_| apply_station(&pick, kind)>
+                                    <span class="pick-main">
+                                        <b>{station_title(&st, t)}</b>
+                                        <small class="muted">{st.address.clone()}</small>
+                                    </span>
+                                    <span class="pick-side">
+                                        {price.map(|p| view! { <b>{p}</b> })}
+                                        <small class="muted">{dist}</small>
+                                    </span>
+                                </button>
+                            }
+                        })
+                        .collect_view()}
+                    <button type="button" class="link-btn" on:click=move |_| nearby.set(None)>
+                        {t.close}
+                    </button>
+                </div>
+            }
+            .into_any(),
+        )
     };
 
     let submit = move |ev: leptos::ev::SubmitEvent| {
@@ -510,21 +604,13 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 </div>
                 <label class="field">
                     <span>{t.station}</span>
-                    <input
-                        list="dl-station"
-                        autocomplete="off"
-                        prop:value=move || station.get()
-                        on:input=move |ev| station.set(event_target_value(&ev))
-                        on:change=move |ev| on_station_change(event_target_value(&ev))
-                    />
-                </label>
-                <label class="field">
-                    <span>{t.address}</span>
                     <div class="input-row">
                         <input
+                            list="dl-station"
                             autocomplete="off"
-                            prop:value=move || address.get()
-                            on:input=move |ev| address.set(event_target_value(&ev))
+                            prop:value=move || station.get()
+                            on:input=move |ev| station.set(event_target_value(&ev))
+                            on:change=move |ev| on_station_change(event_target_value(&ev))
                         />
                         <button
                             type="button"
@@ -533,9 +619,18 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                             on:click=locate.clone()
                         >
                             {icon(Icon::Locate)}
-                            {move || if locating.get() { store.t().locating } else { store.t().locate }}
+                            {move || if locating.get() { store.t().locating } else { store.t().nearby }}
                         </button>
                     </div>
+                </label>
+                {picker}
+                <label class="field">
+                    <span>{t.address}</span>
+                    <input
+                        autocomplete="off"
+                        prop:value=move || address.get()
+                        on:input=move |ev| address.set(event_target_value(&ev))
+                    />
                 </label>
                 {move || {
                     coords

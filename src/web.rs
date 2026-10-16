@@ -142,15 +142,6 @@ pub async fn geolocate() -> Result<(f64, f64), String> {
     }
 }
 
-/// Distance between two coordinates in meters.
-pub fn haversine((lat1, lng1): (f64, f64), (lat2, lng2): (f64, f64)) -> f64 {
-    let r = 6_371_000.0;
-    let d_lat = (lat2 - lat1).to_radians();
-    let d_lng = (lng2 - lng1).to_radians();
-    let a = (d_lat / 2.0).sin().powi(2) + lat1.to_radians().cos() * lat2.to_radians().cos() * (d_lng / 2.0).sin().powi(2);
-    2.0 * r * a.sqrt().asin()
-}
-
 pub fn new_id() -> String {
     let rand = (js_sys::Math::random() * 2f64.powi(40)) as u64;
     format!("{}{}", radix36(now_ms() as u64), radix36(rand))

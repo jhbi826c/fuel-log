@@ -15,6 +15,14 @@ UI languages: English, 中文, Deutsch.
   - Car display compared with the calculated value, and discounts saved.
 - **Charts**: consumption trend, price trend and monthly spending, with touch-friendly tooltips.
 - **Tables**: per year, per station and per fuel type.
+- **Price search**: stations around your location or a place you enter, filtered by radius and fuel type, sorted by price or distance. It works across borders, using live official data where a country publishes it:
+  - Germany: [Tankerkönig](https://creativecommons.tankerkoenig.de) (MTS-K data, free API key needed).
+  - Austria: [E-Control](https://www.e-control.at/spritpreisrechner).
+  - France, Italy, Spain, Croatia, Slovenia, Denmark, Sweden, Greece, Romania: [fuel-prices.eu](https://www.fuel-prices.eu).
+  - Countries without per-station data (e.g. Czechia, Poland): stations come from OpenStreetMap, shown with the weekly national average and the last price you paid there.
+- **Station picker**: "Nearby" in the fill-up form fills in the address (Nominatim) and lists the stations around you; picking one fills in name, address, location and the current price.
+- **Currencies**: prices from other currencies are converted with ECB reference rates ([Frankfurter](https://frankfurter.dev)), plus a configurable card fee to approximate Visa/Mastercard billing.
+- **Map links**: Google Maps, Apple Maps, OpenStreetMap or OsmAnd.
 - **Several vehicles.**
 - **Data**:
   - Stored locally in the browser.

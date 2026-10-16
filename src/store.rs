@@ -1,9 +1,10 @@
 use leptos::prelude::*;
 
+use crate::fx::{self, Rates};
 use crate::i18n::{Lang, Texts};
 use crate::model::{AppData, Record, Settings, SyncConf, Vehicle};
 use crate::stats::{Entry, analyze};
-use crate::storage::{self, DATA_KEY, SETTINGS_KEY, SYNC_KEY};
+use crate::storage::{self, DATA_KEY, RATES_KEY, SETTINGS_KEY, SYNC_KEY};
 use crate::web;
 
 /// Application state shared through context.
@@ -16,6 +17,7 @@ pub struct Store {
     /// Bumped on every local edit.
     pub local_change: RwSignal<u64>,
     pub save_error: RwSignal<Option<String>>,
+    pub rates: RwSignal<Option<Rates>>,
 }
 
 impl Store {
@@ -34,7 +36,42 @@ impl Store {
             sync_busy: RwSignal::new(false),
             local_change: RwSignal::new(0),
             save_error: RwSignal::new(None),
+            rates: RwSignal::new(storage::load(RATES_KEY)),
         }
+    }
+
+    /// ISO code of the display currency, if known.
+    pub fn currency_iso(&self) -> Option<String> {
+        self.settings.with(|s| fx::iso_code(&s.currency))
+    }
+
+    /// A euro amount in the display currency (with card markup), if convertible.
+    pub fn convert_eur(&self, eur: f64) -> Option<f64> {
+        let iso = self.currency_iso()?;
+        let markup = self.settings.with(|s| s.card_markup);
+        if iso == "EUR" {
+            return Some(eur);
+        }
+        self.rates.with(|r| r.as_ref()?.convert_eur(&iso, markup, eur))
+    }
+
+    /// Loads exchange rates when missing or stale and the display currency is not EUR.
+    pub fn refresh_rates(&self) {
+        let fresh = self
+            .rates
+            .with_untracked(|r| r.as_ref().is_some_and(|r| web::now_ms() - r.fetched < fx::MAX_AGE_MS));
+        if fresh || self.currency_iso().is_none_or(|c| c == "EUR") {
+            return;
+        }
+        let rates = self.rates;
+        leptos::task::spawn_local(async move {
+            let Ok(res) = gloo_net::http::Request::get(fx::RATES_URL).send().await else { return };
+            let Ok(v) = res.json::<serde_json::Value>().await else { return };
+            if let Some(r) = Rates::parse(&v, web::now_ms()) {
+                let _ = storage::save(RATES_KEY, &r);
+                rates.set(Some(r));
+            }
+        });
     }
 
     pub fn lang(&self) -> Lang {

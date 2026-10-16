@@ -201,27 +201,40 @@ impl AppData {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(from = "String", into = "String")]
 pub enum MapProvider {
     #[default]
     Google,
     Apple,
-    Amap,
     Osm,
+    OsmAnd,
+}
+
+impl From<String> for MapProvider {
+    fn from(s: String) -> Self {
+        Self::from_key(&s)
+    }
+}
+
+impl From<MapProvider> for String {
+    fn from(p: MapProvider) -> Self {
+        p.key().to_string()
+    }
 }
 
 impl MapProvider {
-    pub const ALL: [MapProvider; 4] = [Self::Google, Self::Apple, Self::Amap, Self::Osm];
+    pub const ALL: [MapProvider; 4] = [Self::Google, Self::Apple, Self::Osm, Self::OsmAnd];
 
     pub fn key(self) -> &'static str {
         match self {
             Self::Google => "google",
             Self::Apple => "apple",
-            Self::Amap => "amap",
             Self::Osm => "osm",
+            Self::OsmAnd => "osmand",
         }
     }
 
+    /// Unknown keys (e.g. removed providers) fall back to the default.
     pub fn from_key(k: &str) -> Self {
         Self::ALL.into_iter().find(|p| p.key() == k).unwrap_or_default()
     }
@@ -230,8 +243,27 @@ impl MapProvider {
         match self {
             Self::Google => "Google Maps",
             Self::Apple => "Apple Maps",
-            Self::Amap => "高德地图 Amap",
             Self::Osm => "OpenStreetMap",
+            Self::OsmAnd => "OsmAnd",
+        }
+    }
+
+    /// Map link showing a point.
+    pub fn point_url(self, lat: f64, lng: f64, label: &str) -> String {
+        match self {
+            Self::Google => format!("https://www.google.com/maps/search/?api=1&query={lat},{lng}"),
+            Self::Apple => format!("https://maps.apple.com/?ll={lat},{lng}&q={}", enc(label)),
+            Self::Osm => format!("https://www.openstreetmap.org/?mlat={lat}&mlon={lng}#map=17/{lat}/{lng}"),
+            Self::OsmAnd => format!("https://osmand.net/map/?pin={lat},{lng}#17/{lat}/{lng}"),
+        }
+    }
+
+    /// Link that starts navigation to a point where the provider supports it.
+    pub fn route_url(self, lat: f64, lng: f64, label: &str) -> String {
+        match self {
+            Self::Google => format!("https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"),
+            Self::Apple => format!("https://maps.apple.com/?daddr={lat},{lng}&q={}", enc(label)),
+            Self::Osm | Self::OsmAnd => self.point_url(lat, lng, label),
         }
     }
 
@@ -239,15 +271,7 @@ impl MapProvider {
     pub fn url(self, r: &Record) -> Option<String> {
         let label = if r.station.is_empty() { "Fuel" } else { r.station.as_str() };
         if let Some((lat, lng)) = r.coords() {
-            return Some(match self {
-                Self::Google => format!("https://www.google.com/maps/search/?api=1&query={lat},{lng}"),
-                Self::Apple => format!("https://maps.apple.com/?ll={lat},{lng}&q={}", enc(label)),
-                Self::Amap => format!(
-                    "https://uri.amap.com/marker?position={lng},{lat}&name={}&coordinate=wgs84",
-                    enc(label)
-                ),
-                Self::Osm => format!("https://www.openstreetmap.org/?mlat={lat}&mlon={lng}#map=17/{lat}/{lng}"),
-            });
+            return Some(self.point_url(lat, lng, label));
         }
         let q = [r.station.as_str(), r.address.as_str()]
             .iter()
@@ -262,9 +286,67 @@ impl MapProvider {
         Some(match self {
             Self::Google => format!("https://www.google.com/maps/search/?api=1&query={q}"),
             Self::Apple => format!("https://maps.apple.com/?q={q}"),
-            Self::Amap => format!("https://uri.amap.com/search?keyword={q}"),
-            Self::Osm => format!("https://www.openstreetmap.org/search?query={q}"),
+            Self::Osm | Self::OsmAnd => format!("https://www.openstreetmap.org/search?query={q}"),
         })
+    }
+}
+
+/// Fuel grades that price sources report.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FuelKind {
+    #[default]
+    E10,
+    E5,
+    Diesel,
+    Premium,
+    Lpg,
+}
+
+impl FuelKind {
+    pub const ALL: [FuelKind; 5] = [Self::E10, Self::E5, Self::Diesel, Self::Premium, Self::Lpg];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::E10 => "e10",
+            Self::E5 => "e5",
+            Self::Diesel => "diesel",
+            Self::Premium => "premium",
+            Self::Lpg => "lpg",
+        }
+    }
+
+    pub fn from_key(k: &str) -> Self {
+        Self::ALL.into_iter().find(|f| f.key() == k).unwrap_or_default()
+    }
+
+    /// Name used in records and selectors.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::E10 => "Super E10",
+            Self::E5 => "Super E5 (95)",
+            Self::Diesel => "Diesel",
+            Self::Premium => "Super Plus (98)",
+            Self::Lpg => "LPG",
+        }
+    }
+
+    /// Best guess for a free-text fuel name.
+    pub fn from_name(s: &str) -> Option<Self> {
+        let s = s.to_lowercase();
+        if s.contains("e10") {
+            Some(Self::E10)
+        } else if s.contains("diesel") || s.contains("柴油") || s.contains("nafta") || s.contains("gazole") {
+            Some(Self::Diesel)
+        } else if s.contains("lpg") || s.contains("autogas") || s.contains("gpl") {
+            Some(Self::Lpg)
+        } else if s.contains("98") || s.contains("plus") || s.contains("v-power") || s.contains("ultimate") {
+            Some(Self::Premium)
+        } else if s.contains("e5") || s.contains("95") || s.contains("super") || s.contains("natural") {
+            Some(Self::E5)
+        } else {
+            None
+        }
     }
 }
 
@@ -288,6 +370,13 @@ pub struct Settings {
     pub currency: String,
     pub map_provider: MapProvider,
     pub active_vehicle: String,
+    pub tankerkoenig_key: String,
+    pub search_fuel: FuelKind,
+    pub search_radius: u32,
+    pub sort_by_price: bool,
+    pub only_open: bool,
+    /// Foreign-currency fee of the payment card, percent.
+    pub card_markup: f64,
 }
 
 impl Default for Settings {
@@ -297,6 +386,12 @@ impl Default for Settings {
             currency: "€".into(),
             map_provider: MapProvider::Google,
             active_vehicle: String::new(),
+            tankerkoenig_key: String::new(),
+            search_fuel: FuelKind::E10,
+            search_radius: 10,
+            sort_by_price: true,
+            only_open: true,
+            card_markup: 0.0,
         }
     }
 }
@@ -368,6 +463,24 @@ mod tests {
         let mut l2 = local.clone();
         l2.merge(&AppData { records: vec![newer_delete], ..Default::default() });
         assert!(l2.records.iter().find(|r| r.id == "b").unwrap().deleted);
+    }
+
+    #[test]
+    fn removed_map_provider_falls_back() {
+        let s: Settings = serde_json::from_str(r#"{"mapProvider":"amap","currency":"Kč"}"#).unwrap();
+        assert_eq!(s.map_provider, MapProvider::Google);
+        assert_eq!(s.currency, "Kč");
+        assert!(serde_json::to_string(&s).unwrap().contains(r#""mapProvider":"google""#));
+    }
+
+    #[test]
+    fn fuel_names() {
+        assert_eq!(FuelKind::from_name("Super E10"), Some(FuelKind::E10));
+        assert_eq!(FuelKind::from_name("Natural 95"), Some(FuelKind::E5));
+        assert_eq!(FuelKind::from_name("0# 柴油"), Some(FuelKind::Diesel));
+        assert_eq!(FuelKind::from_name("Super Plus (98)"), Some(FuelKind::Premium));
+        assert_eq!(FuelKind::from_name("Autogas"), Some(FuelKind::Lpg));
+        assert_eq!(FuelKind::from_name("AdBlue"), None);
     }
 
     #[test]

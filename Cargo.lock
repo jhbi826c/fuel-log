@@ -365,6 +365,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "console_error_panic_hook",
+ "futures",
  "gloo-net 0.7.0",
  "js-sys",
  "leptos",

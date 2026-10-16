@@ -43,6 +43,10 @@
 
           toolchain = pkgs.rust-bin.stable.latest.default.override {
             targets = [ "wasm32-unknown-unknown" ];
+            extensions = [
+              "rust-src"
+              "rust-analyzer"
+            ];
           };
           craneLib = (crane.mkLib pkgs).overrideToolchain (_: toolchain);
 
