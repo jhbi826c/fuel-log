@@ -6,6 +6,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 
 use crate::i18n::fill;
+use crate::model::Theme;
 use crate::stats::{Range, parse_dt};
 use crate::store::Store;
 use crate::sync::{SyncError, sync_once};
@@ -173,6 +174,11 @@ pub fn App() -> impl IntoView {
     Effect::new(move |_| {
         let lang = store.lang();
         web::set_document_lang(lang.code(), lang.t().app_name);
+    });
+
+    Effect::new(move |_| {
+        let theme = store.settings.with(|s| s.theme);
+        web::set_theme((theme != Theme::Auto).then(|| theme.key()));
     });
 
     Effect::new(move |prev: Option<u64>| {

@@ -4,7 +4,7 @@ use wasm_bindgen::JsCast;
 
 use crate::app::{Ui, run_sync};
 use crate::i18n::{Lang, fill};
-use crate::model::{AppData, MapProvider};
+use crate::model::{AppData, MapProvider, Theme};
 use crate::store::Store;
 use crate::{format, web};
 
@@ -152,6 +152,29 @@ pub fn SettingsView() -> impl IntoView {
                                 view! {
                                     <option value=p.key() selected=p == settings.map_provider>
                                         {p.name()}
+                                    </option>
+                                }
+                            })
+                            .collect_view()}
+                    </select>
+                </label>
+                <label class="field">
+                    <span>{t.theme}</span>
+                    <select on:change=move |ev| {
+                        let th = Theme::from_key(&event_target_value(&ev));
+                        store.update_settings(|s| s.theme = th);
+                    }>
+                        {Theme::ALL
+                            .into_iter()
+                            .map(|th| {
+                                let name = match th {
+                                    Theme::Auto => t.theme_auto,
+                                    Theme::Light => t.theme_light,
+                                    Theme::Dark => t.theme_dark,
+                                };
+                                view! {
+                                    <option value=th.key() selected=th == settings.theme>
+                                        {name}
                                     </option>
                                 }
                             })

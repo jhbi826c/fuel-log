@@ -184,3 +184,12 @@ pub async fn timeout<T>(ms: i32, fut: impl std::future::Future<Output = T>) -> R
         Either::Right(_) => Err("timeout".into()),
     }
 }
+
+/// Forces light or dark colors, or follows the system when `None`.
+pub fn set_theme(theme: Option<&str>) {
+    let Some(el) = window().document().and_then(|d| d.document_element()) else { return };
+    let _ = match theme {
+        Some(t) => el.set_attribute("data-theme", t),
+        None => el.remove_attribute("data-theme"),
+    };
+}

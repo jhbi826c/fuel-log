@@ -294,6 +294,31 @@ pub fn enc(s: &str) -> String {
     out
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    #[default]
+    Auto,
+    Light,
+    Dark,
+}
+
+impl Theme {
+    pub const ALL: [Theme; 3] = [Self::Auto, Self::Light, Self::Dark];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Light => "light",
+            Self::Dark => "dark",
+        }
+    }
+
+    pub fn from_key(k: &str) -> Self {
+        Self::ALL.into_iter().find(|t| t.key() == k).unwrap_or_default()
+    }
+}
+
 /// Per-device preferences (not synced).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -302,6 +327,7 @@ pub struct Settings {
     pub currency: String,
     pub map_provider: MapProvider,
     pub active_vehicle: String,
+    pub theme: Theme,
 }
 
 impl Default for Settings {
@@ -311,6 +337,7 @@ impl Default for Settings {
             currency: "€".into(),
             map_provider: MapProvider::Google,
             active_vehicle: String::new(),
+            theme: Theme::Auto,
         }
     }
 }
@@ -391,6 +418,9 @@ mod tests {
         assert_eq!(s.map_provider, MapProvider::Google);
         assert_eq!(s.currency, "Kč");
         assert!(serde_json::to_string(&s).unwrap().contains(r#""mapProvider":"google""#));
+        assert_eq!(s.theme, Theme::Auto);
+        let dark: Settings = serde_json::from_str(r#"{"theme":"dark"}"#).unwrap();
+        assert_eq!(dark.theme, Theme::Dark);
     }
 
     #[test]
