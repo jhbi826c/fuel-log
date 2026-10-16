@@ -9,9 +9,7 @@ use crate::i18n::fill;
 use crate::stats::{Range, parse_dt};
 use crate::store::Store;
 use crate::sync::{SyncError, sync_once};
-use crate::model::FuelKind;
-use crate::places::Station;
-use crate::views::{Icon, Overview, PriceSearch, PricesView, RecordForm, Records, SettingsView, icon};
+use crate::views::{Icon, Overview, RecordForm, Records, SettingsView, icon};
 use crate::web;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -20,15 +18,7 @@ pub enum Route {
     Records,
     Add,
     Edit(String),
-    Prices,
     Settings,
-}
-
-/// Station and fuel to start a new fill-up with.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Prefill {
-    pub station: Station,
-    pub fuel: FuelKind,
 }
 
 impl Route {
@@ -40,7 +30,6 @@ impl Route {
                 "records" => Self::Records,
                 "add" => Self::Add,
                 "settings" => Self::Settings,
-                "prices" => Self::Prices,
                 _ => Self::Overview,
             },
         }
@@ -86,9 +75,6 @@ pub struct Ui {
     toast_seq: RwSignal<u64>,
     pub period: RwSignal<Period>,
     pub search: RwSignal<String>,
-    /// Station chosen in the price search for the next new fill-up.
-    pub prefill: RwSignal<Option<Prefill>>,
-    pub price_search: RwSignal<Option<PriceSearch>>,
     sync_pending: RwSignal<bool>,
 }
 
@@ -175,8 +161,6 @@ pub fn App() -> impl IntoView {
         toast_seq: RwSignal::new(0),
         period: RwSignal::new(Period::All),
         search: RwSignal::new(String::new()),
-        prefill: RwSignal::new(None),
-        price_search: RwSignal::new(None),
         sync_pending: RwSignal::new(false),
     };
     provide_context(ui);
@@ -189,11 +173,6 @@ pub fn App() -> impl IntoView {
     Effect::new(move |_| {
         let lang = store.lang();
         web::set_document_lang(lang.code(), lang.t().app_name);
-    });
-
-    Effect::new(move |_| {
-        store.settings.with(|s| s.currency.clone());
-        store.refresh_rates();
     });
 
     Effect::new(move |prev: Option<u64>| {
@@ -260,22 +239,30 @@ pub fn App() -> impl IntoView {
                 Route::Records => view! { <Records /> }.into_any(),
                 Route::Add => view! { <RecordForm /> }.into_any(),
                 Route::Edit(id) => view! { <RecordForm id=id /> }.into_any(),
-                Route::Prices => view! { <PricesView /> }.into_any(),
                 Route::Settings => view! { <SettingsView /> }.into_any(),
             }}
         </main>
         <nav class="tabbar">
             <Tab href="#/overview" icon=Icon::Chart label=|t| t.nav_overview active=|r| *r == Route::Overview />
-            <Tab href="#/records" icon=Icon::List label=|t| t.nav_records active=|r| *r == Route::Records />
             <Tab
-                href="#/add"
-                icon=Icon::Plus
-                label=|t| t.nav_add
-                active=|r| matches!(r, Route::Add | Route::Edit(_))
+                href="#/records"
+                icon=Icon::List
+                label=|t| t.nav_records
+                active=|r| matches!(r, Route::Records | Route::Add | Route::Edit(_))
             />
-            <Tab href="#/prices" icon=Icon::Fuel label=|t| t.nav_prices active=|r| *r == Route::Prices />
             <Tab href="#/settings" icon=Icon::Settings label=|t| t.nav_settings active=|r| *r == Route::Settings />
         </nav>
+        {move || {
+            matches!(ui.route.get(), Route::Overview | Route::Records)
+                .then(|| {
+                    view! {
+                        <a class="fab" href="#/add" title=move || store.t().nav_add aria-label=move || store.t().nav_add>
+                            {icon(Icon::Plus)}
+                            <span>{move || store.t().nav_add}</span>
+                        </a>
+                    }
+                })
+        }}
         <ToastView />
     }
 }
@@ -370,7 +357,6 @@ mod tests {
         assert_eq!(Route::parse(""), Route::Overview);
         assert_eq!(Route::parse("#/records"), Route::Records);
         assert_eq!(Route::parse("#/edit/abc"), Route::Edit("abc".into()));
-        assert_eq!(Route::parse("#/prices"), Route::Prices);
         assert_eq!(Route::parse("#/edit/"), Route::Overview);
     }
 

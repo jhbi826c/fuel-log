@@ -11,7 +11,6 @@ use crate::{csv, format, web};
 
 const TOKEN_URL: &str = "https://github.com/settings/tokens/new?scopes=gist&description=Fuel%20Log";
 const CURRENCIES: [&str; 9] = ["€", "Kč", "zł", "CHF", "£", "$", "¥", "Ft", "kr"];
-const TANKERKOENIG_URL: &str = "https://creativecommons.tankerkoenig.de/";
 
 fn picked_file(ev: &leptos::ev::Event) -> Option<web_sys::File> {
     let input = ev.target()?.dyn_into::<web_sys::HtmlInputElement>().ok()?;
@@ -266,64 +265,6 @@ pub fn SettingsView() -> impl IntoView {
         }
     };
 
-    let prices = move || {
-        let t = store.t();
-        let l = store.lang();
-        let s = store.settings.get();
-        let rates = store.rates.get();
-        let iso = store.currency_iso();
-        let rate_line = match (&iso, &rates) {
-            (Some(code), _) if code == "EUR" => None,
-            (Some(code), Some(r)) => r.rate(code).map(|rate| {
-                fill(
-                    t.rate_line,
-                    &[("rate", &format::num(l, rate, 4)), ("code", code), ("date", &format::short_date(l, &r.date))],
-                )
-            }),
-            (Some(_), None) => Some(t.fx_missing.to_string()),
-            (None, _) => Some(t.currency_unknown.to_string()),
-        };
-        view! {
-            <section class="card">
-                <h2>{t.prices_title}</h2>
-                <p class="muted">{t.prices_intro}</p>
-                <label class="field">
-                    <span>{t.tk_key}</span>
-                    <input
-                        autocomplete="off"
-                        spellcheck="false"
-                        placeholder="00000000-0000-0000-0000-000000000000"
-                        prop:value=s.tankerkoenig_key.clone()
-                        on:change=move |ev| {
-                            let v = event_target_value(&ev).trim().to_string();
-                            store.update_settings(|s| s.tankerkoenig_key = v);
-                        }
-                    />
-                </label>
-                <p class="hint">
-                    {t.tk_key_hint}" "
-                    <a href=TANKERKOENIG_URL target="_blank" rel="noopener">
-                        "creativecommons.tankerkoenig.de ↗"
-                    </a>
-                </p>
-                <label class="field">
-                    <span>{t.card_markup}" (%)"</span>
-                    <input
-                        inputmode="decimal"
-                        autocomplete="off"
-                        prop:value=format::input_num(l, s.card_markup, 2)
-                        on:change=move |ev| {
-                            let v = format::parse_num(&event_target_value(&ev)).unwrap_or(0.0).clamp(0.0, 20.0);
-                            store.update_settings(|s| s.card_markup = v);
-                        }
-                    />
-                </label>
-                <p class="hint">{t.card_markup_hint}</p>
-                {rate_line.map(|r| view! { <p class="hint">{r}</p> })}
-            </section>
-        }
-    };
-
     let sync = move || {
         let t = store.t();
         let l = store.lang();
@@ -467,7 +408,6 @@ pub fn SettingsView() -> impl IntoView {
     view! {
         {general}
         {vehicles}
-        {prices}
         {sync}
         {data}
     }

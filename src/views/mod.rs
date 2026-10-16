@@ -1,12 +1,10 @@
 mod form;
-mod prices;
 mod overview;
 mod records;
 mod settings;
 
 pub use form::RecordForm;
 pub use overview::Overview;
-pub use prices::{PriceSearch, PricesView};
 pub use records::Records;
 pub use settings::SettingsView;
 
@@ -28,7 +26,6 @@ pub enum Icon {
     Sync,
     Pin,
     Locate,
-    Fuel,
 }
 
 impl Icon {
@@ -43,9 +40,6 @@ impl Icon {
             Self::Sync => r#"<path d="M21 12a9 9 0 0 1-15.4 6.4L3 16M3 12a9 9 0 0 1 15.4-6.4L21 8M21 3v5h-5M3 21v-5h5"/>"#,
             Self::Pin => r#"<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>"#,
             Self::Locate => r#"<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>"#,
-            Self::Fuel => {
-                r#"<path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M3 21h13M7 7h5v4H7z"/><path d="M15 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/>"#
-            }
         }
     }
 }

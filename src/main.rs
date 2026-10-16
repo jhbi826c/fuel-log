@@ -3,7 +3,6 @@ mod charts;
 mod csv;
 mod demo;
 mod format;
-mod fx;
 mod i18n;
 mod model;
 mod places;

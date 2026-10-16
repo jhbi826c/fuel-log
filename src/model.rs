@@ -258,15 +258,6 @@ impl MapProvider {
         }
     }
 
-    /// Link that starts navigation to a point where the provider supports it.
-    pub fn route_url(self, lat: f64, lng: f64, label: &str) -> String {
-        match self {
-            Self::Google => format!("https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"),
-            Self::Apple => format!("https://maps.apple.com/?daddr={lat},{lng}&q={}", enc(label)),
-            Self::Osm | Self::OsmAnd => self.point_url(lat, lng, label),
-        }
-    }
-
     /// Map link for a record's location or, failing that, its station name/address.
     pub fn url(self, r: &Record) -> Option<String> {
         let label = if r.station.is_empty() { "Fuel" } else { r.station.as_str() };
@@ -291,65 +282,6 @@ impl MapProvider {
     }
 }
 
-/// Fuel grades that price sources report.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum FuelKind {
-    #[default]
-    E10,
-    E5,
-    Diesel,
-    Premium,
-    Lpg,
-}
-
-impl FuelKind {
-    pub const ALL: [FuelKind; 5] = [Self::E10, Self::E5, Self::Diesel, Self::Premium, Self::Lpg];
-
-    pub fn key(self) -> &'static str {
-        match self {
-            Self::E10 => "e10",
-            Self::E5 => "e5",
-            Self::Diesel => "diesel",
-            Self::Premium => "premium",
-            Self::Lpg => "lpg",
-        }
-    }
-
-    pub fn from_key(k: &str) -> Self {
-        Self::ALL.into_iter().find(|f| f.key() == k).unwrap_or_default()
-    }
-
-    /// Name used in records and selectors.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::E10 => "Super E10",
-            Self::E5 => "Super E5 (95)",
-            Self::Diesel => "Diesel",
-            Self::Premium => "Super Plus (98)",
-            Self::Lpg => "LPG",
-        }
-    }
-
-    /// Best guess for a free-text fuel name.
-    pub fn from_name(s: &str) -> Option<Self> {
-        let s = s.to_lowercase();
-        if s.contains("e10") {
-            Some(Self::E10)
-        } else if s.contains("diesel") || s.contains("柴油") || s.contains("nafta") || s.contains("gazole") {
-            Some(Self::Diesel)
-        } else if s.contains("lpg") || s.contains("autogas") || s.contains("gpl") {
-            Some(Self::Lpg)
-        } else if s.contains("98") || s.contains("plus") || s.contains("v-power") || s.contains("ultimate") {
-            Some(Self::Premium)
-        } else if s.contains("e5") || s.contains("95") || s.contains("super") || s.contains("natural") {
-            Some(Self::E5)
-        } else {
-            None
-        }
-    }
-}
-
 /// Percent-encodes a URL query component.
 pub fn enc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -370,13 +302,6 @@ pub struct Settings {
     pub currency: String,
     pub map_provider: MapProvider,
     pub active_vehicle: String,
-    pub tankerkoenig_key: String,
-    pub search_fuel: FuelKind,
-    pub search_radius: u32,
-    pub sort_by_price: bool,
-    pub only_open: bool,
-    /// Foreign-currency fee of the payment card, percent.
-    pub card_markup: f64,
 }
 
 impl Default for Settings {
@@ -386,12 +311,6 @@ impl Default for Settings {
             currency: "€".into(),
             map_provider: MapProvider::Google,
             active_vehicle: String::new(),
-            tankerkoenig_key: String::new(),
-            search_fuel: FuelKind::E10,
-            search_radius: 10,
-            sort_by_price: true,
-            only_open: true,
-            card_markup: 0.0,
         }
     }
 }
@@ -467,20 +386,11 @@ mod tests {
 
     #[test]
     fn removed_map_provider_falls_back() {
-        let s: Settings = serde_json::from_str(r#"{"mapProvider":"amap","currency":"Kč"}"#).unwrap();
+        let s: Settings =
+            serde_json::from_str(r#"{"mapProvider":"amap","currency":"Kč","tankerkoenigKey":"x","cardMarkup":1.5}"#).unwrap();
         assert_eq!(s.map_provider, MapProvider::Google);
         assert_eq!(s.currency, "Kč");
         assert!(serde_json::to_string(&s).unwrap().contains(r#""mapProvider":"google""#));
-    }
-
-    #[test]
-    fn fuel_names() {
-        assert_eq!(FuelKind::from_name("Super E10"), Some(FuelKind::E10));
-        assert_eq!(FuelKind::from_name("Natural 95"), Some(FuelKind::E5));
-        assert_eq!(FuelKind::from_name("0# 柴油"), Some(FuelKind::Diesel));
-        assert_eq!(FuelKind::from_name("Super Plus (98)"), Some(FuelKind::Premium));
-        assert_eq!(FuelKind::from_name("Autogas"), Some(FuelKind::Lpg));
-        assert_eq!(FuelKind::from_name("AdBlue"), None);
     }
 
     #[test]

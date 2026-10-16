@@ -109,8 +109,8 @@ fn get_f64(obj: &JsValue, key: &str) -> Option<f64> {
     Reflect::get(obj, &JsValue::from_str(key)).ok()?.as_f64()
 }
 
-/// Current position as (latitude, longitude).
-pub async fn geolocate() -> Result<(f64, f64), String> {
+/// Current position without a hard deadline.
+async fn geolocate_inner() -> Result<(f64, f64), String> {
     let geo = window().navigator().geolocation().map_err(|_| "unavailable".to_string())?;
     let promise = Promise::new(&mut |resolve: Function, reject: Function| {
         let ok = Closure::once_into_js(move |pos: JsValue| {
@@ -159,4 +159,28 @@ fn radix36(mut n: u64) -> String {
     }
     out.reverse();
     String::from_utf8(out).unwrap_or_default()
+}
+
+/// Current position as (latitude, longitude), giving up after 20 s.
+pub async fn geolocate() -> Result<(f64, f64), String> {
+    timeout(20_000, geolocate_inner()).await?
+}
+
+/// Resolves after `ms` milliseconds.
+pub async fn sleep(ms: i32) {
+    let promise = Promise::new(&mut |resolve: Function, _| {
+        let _ = window().set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms);
+    });
+    let _ = JsFuture::from(promise).await;
+}
+
+/// Runs `fut`, failing with "timeout" after `ms` milliseconds.
+pub async fn timeout<T>(ms: i32, fut: impl std::future::Future<Output = T>) -> Result<T, String> {
+    use futures::future::{Either, select};
+    let fut = std::pin::pin!(fut);
+    let limit = std::pin::pin!(sleep(ms));
+    match select(fut, limit).await {
+        Either::Left((v, _)) => Ok(v),
+        Either::Right(_) => Err("timeout".into()),
+    }
 }
