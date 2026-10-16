@@ -223,6 +223,7 @@ pub struct Texts {
 
     pub nearby: &'static str,
     pub no_nearby: &'static str,
+    pub nearby_failed: &'static str,
     pub pick_station: &'static str,
     pub close: &'static str,
     pub unnamed_station: &'static str,
@@ -403,8 +404,9 @@ pub const EN: Texts = Texts {
     about: "About",
 
     nearby: "Nearby",
-    no_nearby: "No fuel stations found nearby.",
-    pick_station: "Stations nearby – tap to use:",
+    no_nearby: "No fuel stations found within {km} km.",
+    nearby_failed: "Could not load nearby stations",
+    pick_station: "Stations within {km} km – tap to use:",
     close: "Close",
     unnamed_station: "Fuel station",
 
@@ -584,8 +586,9 @@ pub const ZH: Texts = Texts {
     about: "关于",
 
     nearby: "附近",
-    no_nearby: "附近没有找到加油站。",
-    pick_station: "附近的加油站，点击选择：",
+    no_nearby: "{km} km 内没有找到加油站。",
+    nearby_failed: "无法加载附近的加油站",
+    pick_station: "{km} km 内的加油站，点击选择：",
     close: "收起",
     unnamed_station: "加油站",
 
@@ -765,8 +768,9 @@ pub const DE: Texts = Texts {
     about: "Über",
 
     nearby: "In der Nähe",
-    no_nearby: "Keine Tankstellen in der Nähe gefunden.",
-    pick_station: "Tankstellen in der Nähe – zum Übernehmen antippen:",
+    no_nearby: "Keine Tankstellen im Umkreis von {km} km gefunden.",
+    nearby_failed: "Tankstellen in der Nähe konnten nicht geladen werden",
+    pick_station: "Tankstellen im Umkreis von {km} km – zum Übernehmen antippen:",
     close: "Schließen",
     unnamed_station: "Tankstelle",
 
@@ -795,7 +799,9 @@ mod tests {
 
     #[test]
     fn placeholders_match_across_languages() {
-        let pick: [fn(&Texts) -> &'static str; 11] = [
+        let pick: [fn(&Texts) -> &'static str; 13] = [
+            |t| t.no_nearby,
+            |t| t.pick_station,
             |t| t.sync_done_pulled,
             |t| t.based_on_segments,
             |t| t.per_100km,

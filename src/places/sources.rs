@@ -1,3 +1,4 @@
+use futures::future::{Either, select, select_ok};
 use gloo_net::http::Request;
 use serde_json::Value;
 
@@ -10,6 +11,8 @@ pub type Origin = (f64, f64);
 const OVERPASS: [&str; 2] = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 const NOMINATIM: &str = "https://nominatim.openstreetmap.org";
 const TIMEOUT_MS: i32 = 12_000;
+/// How long to keep waiting for Overpass once Nominatim has answered.
+const OVERPASS_GRACE_MS: i32 = 3_000;
 
 fn text(v: &Value, k: &str) -> String {
     match &v[k] {
@@ -123,7 +126,7 @@ pub fn parse_nominatim_search(v: &Value, origin: Origin) -> Result<Vec<Station>,
         .collect())
 }
 
-/// Fuel stations from OpenStreetMap: Overpass mirrors and Nominatim queried in parallel, Overpass preferred.
+/// Fuel stations from OpenStreetMap: Overpass mirrors and Nominatim queried in parallel; the first Overpass answer wins, Nominatim is the fallback.
 pub async fn osm_stations(origin: Origin, radius_km: f64) -> Result<Vec<Station>, String> {
     let query = enc(&overpass_query(origin, radius_km));
     let overpass = |base: &'static str| {
@@ -135,11 +138,15 @@ pub async fn osm_stations(origin: Origin, radius_km: f64) -> Result<Vec<Station>
             .await
             .and_then(|v| parse_nominatim_search(&v, origin))
     };
-    let (a, b, n) = futures::join!(overpass(OVERPASS[0]), overpass(OVERPASS[1]), nominatim);
-    match (a, b, n) {
-        (Ok(list), _, _) | (_, Ok(list), _) => Ok(list),
-        (_, _, Ok(list)) => Ok(list),
-        (Err(a), Err(b), Err(n)) => Err(format!("{a}; {b}; {n}")),
+    let overpass = select_ok([Box::pin(overpass(OVERPASS[0])), Box::pin(overpass(OVERPASS[1]))]);
+    match select(overpass, Box::pin(nominatim)).await {
+        Either::Left((Ok((list, _)), _)) => Ok(list),
+        Either::Left((Err(e), nominatim)) => nominatim.await.map_err(|n| format!("{e}; {n}")),
+        Either::Right((Ok(list), overpass)) => match crate::web::timeout(OVERPASS_GRACE_MS, overpass).await {
+            Ok(Ok((better, _))) => Ok(better),
+            _ => Ok(list),
+        },
+        Either::Right((Err(n), overpass)) => overpass.await.map(|(list, _)| list).map_err(|e| format!("{e}; {n}")),
     }
 }
 

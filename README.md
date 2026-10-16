@@ -15,7 +15,7 @@ UI languages: English, 中文, Deutsch.
   - Car display compared with the calculated value, and discounts saved.
 - **Charts**: consumption trend, price trend and monthly spending, with touch-friendly tooltips.
 - **Tables**: per year, per station and per fuel type.
-- **Station picker**: "Nearby" in the fill-up form fills in the address (Nominatim) and lists the fuel stations around you from OpenStreetMap; picking one fills in name, address and location.
+- **Station picker**: "Nearby" in the fill-up form fills in the address (Nominatim) and lists the nearest fuel stations from OpenStreetMap (within 2 km, widening to 5 and 10 km when fewer than 3 are found); picking one fills in name, address and location.
 - **Map links**: Google Maps, Apple Maps, OpenStreetMap or OsmAnd.
 - **Several vehicles.**
 - **Data**:

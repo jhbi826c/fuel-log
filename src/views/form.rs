@@ -22,8 +22,7 @@ enum Trio {
 }
 
 const KNOWN_STATION_KM: f64 = 0.15;
-const NEARBY_KM: f64 = 2.0;
-const NEARBY_LIMIT: usize = 8;
+const NEARBY_LIMIT: usize = 10;
 
 /// Distinct non-empty values, most frequent first.
 fn by_frequency<'a>(values: impl Iterator<Item = &'a str>) -> Vec<String> {
@@ -221,7 +220,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         }
     };
 
-    let nearby = RwSignal::new(None::<Vec<Station>>);
+    let nearby = RwSignal::new(None::<(f64, Vec<Station>)>);
 
     let apply_station = move |st: &Station| {
         let label = st.label();
@@ -249,7 +248,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                     }
                 };
                 coords.set(Some(c));
-                let (addr, found) = futures::join!(places::reverse_geocode(c), places::nearby(c, NEARBY_KM, NEARBY_LIMIT));
+                let (addr, found) = futures::join!(places::reverse_geocode(c), places::nearby(c, NEARBY_LIMIT));
                 if address.get_untracked().is_empty()
                     && let Ok(Some(a)) = addr
                 {
@@ -270,22 +269,25 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                     }
                     ui.toast(fill(t.station_recognized, &[("name", &r.station)]));
                 }
-                nearby.set(Some(found.unwrap_or_default()));
+                match found {
+                    Ok(f) => nearby.set(Some(f)),
+                    Err(e) => ui.error(format!("{} ({e})", t.nearby_failed)),
+                }
                 locating.set(false);
             });
         }
     };
 
     let picker = move || {
-        let list = nearby.get()?;
+        let (km, list) = nearby.get()?;
         let t = store.t();
         if list.is_empty() {
-            return Some(view! { <p class="hint">{t.no_nearby}</p> }.into_any());
+            return Some(view! { <p class="hint">{fill(t.no_nearby, &[("km", &km)])}</p> }.into_any());
         }
         Some(
             view! {
                 <div class="picker">
-                    <p class="hint">{t.pick_station}</p>
+                    <p class="hint">{fill(t.pick_station, &[("km", &km)])}</p>
                     {list
                         .into_iter()
                         .map(|st| {
