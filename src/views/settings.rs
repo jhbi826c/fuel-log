@@ -2,7 +2,6 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 use wasm_bindgen::JsCast;
 
-use super::load_demo;
 use crate::app::{Ui, run_sync};
 use crate::i18n::{Lang, fill};
 use crate::model::{AppData, MapProvider};
@@ -374,21 +373,11 @@ pub fn SettingsView() -> impl IntoView {
                         {t.import_csv}
                         <input type="file" accept=".csv,text/csv,text/plain" hidden on:change=import_csv />
                     </label>
-                    {if has_demo {
-                        view! {
-                            <button class="btn" on:click=remove_demo>
-                                {t.remove_demo}
-                            </button>
-                        }
-                            .into_any()
-                    } else {
-                        view! {
-                            <button class="btn" on:click=move |_| load_demo(store, ui)>
-                                {t.load_demo}
-                            </button>
-                        }
-                            .into_any()
-                    }}
+                    {has_demo.then(|| view! {
+                        <button class="btn" on:click=remove_demo>
+                            {t.remove_demo}
+                        </button>
+                    })}
                     <button class="btn danger" on:click=delete_all disabled=total == 0>
                         {t.delete_all}
                     </button>

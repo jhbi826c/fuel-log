@@ -10,12 +10,7 @@ pub use settings::SettingsView;
 
 use leptos::prelude::*;
 
-use crate::app::Ui;
-use crate::i18n::fill;
-use crate::model::AppData;
-use crate::stats::parse_dt;
 use crate::store::Store;
-use crate::{demo, web};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Icon {
@@ -52,24 +47,9 @@ pub fn icon(i: Icon) -> impl IntoView {
     view! { <span class="ic" inner_html=svg></span> }
 }
 
-/// Adds simulated fill-ups to the active vehicle.
-pub fn load_demo(store: Store, ui: Ui) {
-    let now = parse_dt(&web::now_local()).unwrap_or_default();
-    let ts = web::now_ms();
-    let mut records = demo::generate(&store.active_vehicle(), now, &store.currency());
-    for r in &mut records {
-        r.created_at = ts;
-        r.updated_at = ts;
-    }
-    let n = records.len();
-    store.import(&AppData { version: 1, vehicles: Vec::new(), records });
-    ui.toast(fill(store.t().demo_loaded, &[("n", &n)]));
-}
-
 #[component]
 pub fn EmptyState() -> impl IntoView {
     let store = expect_context::<Store>();
-    let ui = expect_context::<Ui>();
     move || {
         let t = store.t();
         view! {
@@ -77,14 +57,9 @@ pub fn EmptyState() -> impl IntoView {
                 <img src="icons/icon.svg" alt="" width="64" height="64" />
                 <h2>{t.empty_title}</h2>
                 <p class="muted">{t.empty_text}</p>
-                <div class="btn-row center">
-                    <a class="btn primary" href="#/add">
-                        {t.add_first}
-                    </a>
-                    <button class="btn" on:click=move |_| load_demo(store, ui)>
-                        {t.load_demo}
-                    </button>
-                </div>
+                <a class="btn primary" href="#/add">
+                    {t.add_first}
+                </a>
             </div>
         }
     }

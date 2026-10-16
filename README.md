@@ -23,7 +23,6 @@ UI languages: English, 中文, Deutsch.
   - Optional sync across devices through a private GitHub Gist.
   - JSON backup export and import; CSV export and import.
 - **PWA**: can be added to the home screen and works offline.
-- **Demo data** for trying it out.
 
 ## Development
 

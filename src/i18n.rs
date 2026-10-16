@@ -75,11 +75,9 @@ pub struct Texts {
     pub undo: &'static str,
     pub not_enough_data: &'static str,
 
-    pub demo_loaded: &'static str,
     pub empty_title: &'static str,
     pub empty_text: &'static str,
     pub add_first: &'static str,
-    pub load_demo: &'static str,
     pub remove_demo: &'static str,
     pub demo_removed: &'static str,
 
@@ -257,11 +255,9 @@ pub const EN: Texts = Texts {
     undo: "Undo",
     not_enough_data: "Not enough data yet",
 
-    demo_loaded: "{n} demo fill-ups added",
     empty_title: "No fill-ups yet",
-    empty_text: "Record every fill-up to see your consumption, fuel prices and costs. Load the demo data to look around first.",
+    empty_text: "Record every fill-up to see your consumption, fuel prices and costs.",
     add_first: "Add first fill-up",
-    load_demo: "Load demo data",
     remove_demo: "Remove demo data",
     demo_removed: "Demo data removed",
 
@@ -439,11 +435,9 @@ pub const ZH: Texts = Texts {
     undo: "撤销",
     not_enough_data: "数据还不够",
 
-    demo_loaded: "已添加 {n} 条示例记录",
     empty_title: "还没有加油记录",
-    empty_text: "每次加油时记一笔，就能看到油耗、油价和花费统计。也可以先载入示例数据看看效果。",
+    empty_text: "每次加油时记一笔，就能看到油耗、油价和花费统计。",
     add_first: "添加第一条记录",
-    load_demo: "载入示例数据",
     remove_demo: "删除示例数据",
     demo_removed: "示例数据已删除",
 
@@ -621,11 +615,9 @@ pub const DE: Texts = Texts {
     undo: "Rückgängig",
     not_enough_data: "Noch nicht genug Daten",
 
-    demo_loaded: "{n} Beispiel-Tankvorgänge hinzugefügt",
     empty_title: "Noch keine Tankvorgänge",
-    empty_text: "Erfasse jeden Tankvorgang, um Verbrauch, Spritpreise und Kosten zu sehen. Mit Beispieldaten kannst du dich zuerst umsehen.",
+    empty_text: "Erfasse jeden Tankvorgang, um Verbrauch, Spritpreise und Kosten zu sehen.",
     add_first: "Ersten Tankvorgang erfassen",
-    load_demo: "Beispieldaten laden",
     remove_demo: "Beispieldaten entfernen",
     demo_removed: "Beispieldaten entfernt",
 
