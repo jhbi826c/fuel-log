@@ -370,6 +370,7 @@ input,
 select,
 textarea {
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   padding: 9px 12px;
   border: 1px solid var(--border);
@@ -382,6 +383,24 @@ textarea {
 
 select {
   padding-right: 8px;
+}
+
+input:not([type="checkbox"]),
+select {
+  height: 44px;
+}
+
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  max-width: 100%;
+  text-align: left;
+}
+
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
 }
 
 textarea {
@@ -1082,6 +1101,10 @@ td.name {
     gap: 28px;
   }
 
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+
   .grid3 {
     grid-template-columns: 1fr 1fr;
   }
@@ -1092,12 +1115,6 @@ td.name {
 
   .kpis {
     grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 360px) {
-  .grid2 {
-    grid-template-columns: 1fr;
   }
 }
 
