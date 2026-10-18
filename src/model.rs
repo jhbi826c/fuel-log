@@ -51,11 +51,6 @@ pub struct Record {
     pub lat: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lng: Option<f64>,
-    /// Consumption shown by the car's trip computer, L/100 km.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub display_cons: Option<f64>,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub payment: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub notes: String,
     #[serde(default)]
@@ -87,8 +82,6 @@ impl Default for Record {
             address: String::new(),
             lat: None,
             lng: None,
-            display_cons: None,
-            payment: String::new(),
             notes: String::new(),
             created_at: 0.0,
             updated_at: 0.0,

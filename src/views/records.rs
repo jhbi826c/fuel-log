@@ -10,7 +10,7 @@ use crate::store::Store;
 use crate::web;
 
 fn matches(e: &Entry, q: &str) -> bool {
-    [&e.rec.station, &e.rec.address, &e.rec.fuel, &e.rec.notes, &e.rec.payment, &e.rec.date]
+    [&e.rec.station, &e.rec.address, &e.rec.fuel, &e.rec.notes, &e.rec.date]
         .iter()
         .any(|s| s.to_lowercase().contains(q))
 }
@@ -154,8 +154,6 @@ fn record_card(e: Entry, t: &'static Texts, l: Lang, cur: &str, provider: MapPro
             <div class="rec-tags">
                 {(!r.full).then(|| view! { <span class="badge warn">{t.badge_partial}</span> })}
                 {r.missed_previous.then(|| view! { <span class="badge warn">{t.badge_missed}</span> })}
-                {r.display_cons
-                    .map(|d| view! { <span class="badge">{fill(t.badge_display, &[("v", &num(l, d, 1))])}</span> })}
                 {saved.map(|s| view! { <span class="badge good">{fill(t.badge_saved, &[("v", &s)])}</span> })}
                 {r.demo.then(|| view! { <span class="badge">{t.badge_demo}</span> })}
                 {map.map(|url| {

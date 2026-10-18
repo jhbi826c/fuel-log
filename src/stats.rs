@@ -207,9 +207,6 @@ pub struct Stats {
     pub km_per_month: Option<f64>,
     pub avg_interval_days: Option<f64>,
     pub avg_interval_km: Option<f64>,
-    pub display_avg: Option<f64>,
-    /// (car display, calculated) over segments that have both.
-    pub display_cmp: Option<(f64, f64)>,
     pub monthly: Vec<MonthAgg>,
     pub yearly: Vec<YearAgg>,
     pub stations: Vec<GroupAgg>,
@@ -293,18 +290,6 @@ pub fn compute(all: &[Entry], range: &Range) -> Stats {
             s.km_per_month = Some((b - a) / days * DAYS_PER_MONTH);
             s.avg_interval_km = Some((b - a) / (n - 1.0));
         }
-    }
-
-    let displays: Vec<f64> = recs.iter().filter_map(|e| e.rec.display_cons).collect();
-    if !displays.is_empty() {
-        s.display_avg = Some(displays.iter().sum::<f64>() / displays.len() as f64);
-    }
-    let pairs: Vec<(f64, &Segment)> = segs.iter().filter_map(|(e, g)| Some((e.rec.display_cons?, *g))).collect();
-    let pair_dist: f64 = pairs.iter().map(|(_, g)| g.dist).sum();
-    if pair_dist > 0.0 {
-        let disp = pairs.iter().map(|(d, g)| d * g.dist).sum::<f64>() / pair_dist;
-        let calc = pairs.iter().map(|(_, g)| g.liters).sum::<f64>() / pair_dist * 100.0;
-        s.display_cmp = Some((disp, calc));
     }
 
     s.monthly = monthly(&recs);
@@ -552,7 +537,6 @@ mod tests {
     fn stats_totals_and_averages() {
         let mut b = rec("b", "2026-01-31", 1500.0, 30.0, 54.0, true);
         b.paid = Some(50.0);
-        b.display_cons = Some(5.5);
         let e = analyze(&[
             rec("a", "2026-01-01", 1000.0, 40.0, 70.0, true),
             b,
@@ -572,7 +556,6 @@ mod tests {
         assert!(close(s.avg_interval_days.unwrap(), 30.0));
         assert!(close(s.avg_interval_km.unwrap(), 500.0));
         assert!(close(s.cost_per_month.unwrap(), 113.0 / 60.0 * DAYS_PER_MONTH));
-        assert_eq!(s.display_cmp, Some((5.5, 6.0)));
         assert_eq!(s.min_price.as_ref().unwrap().date, "2026-01-31T10:00");
         let months: Vec<_> = s.monthly.iter().map(|m| (m.key.as_str(), m.count)).collect();
         assert_eq!(months, [("2026-01", 2), ("2026-02", 0), ("2026-03", 1)]);

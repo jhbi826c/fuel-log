@@ -84,8 +84,6 @@ fn StatsView(stats: Stats) -> impl IntoView {
 
     let cons_sub = if s.avg_cons.is_some() {
         fill(t.based_on_segments, &[("n", &s.seg_count), ("km", &num(l, s.seg_dist, 0))])
-    } else if let Some(d) = s.display_avg {
-        fill(t.display_only, &[("v", &num(l, d, 1))])
     } else {
         t.need_two_full.to_string()
     };
@@ -132,15 +130,6 @@ fn StatsView(stats: Stats) -> impl IntoView {
             }),
         ),
     ];
-    if let Some((disp, calc)) = s.display_cmp {
-        kpis.push(kpi(
-            t.display_vs_calc,
-            format!("{} / {}", num(l, disp, 1), num(l, calc, 1)),
-            Some(fill(t.deviation, &[("v", &format!("{:+.1}", (disp - calc) / calc * 100.0))])),
-        ));
-    } else if let Some(d) = s.display_avg {
-        kpis.push(kpi(t.display_avg, format!("{} L/100 km", num(l, d, 1)), None));
-    }
     if s.savings > 0.0 {
         kpis.push(kpi(t.savings, money(l, &cur, s.savings, 2), Some(t.savings_sub.to_string())));
     }

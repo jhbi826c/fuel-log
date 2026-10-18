@@ -80,7 +80,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             .filter(|f| !f.is_empty())
             .or_else(|| store.vehicle_fuels(&active).into_iter().next())
             .unwrap_or_default(),
-        payment: last_of_vehicle.as_ref().map(|r| r.payment.clone()).unwrap_or_default(),
         ..Default::default()
     });
     let rec_id = base.id.clone();
@@ -103,8 +102,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     let station = RwSignal::new(base.station.clone());
     let address = RwSignal::new(base.address.clone());
     let coords = RwSignal::new(base.coords());
-    let display = RwSignal::new(s(base.display_cons, 1));
-    let payment = RwSignal::new(base.payment.clone());
     let notes = RwSignal::new(base.notes.clone());
     let order = RwSignal::new(if editing { vec![Trio::Total, Trio::Liters, Trio::Price] } else { Vec::new() });
     let computed = RwSignal::new(None::<Trio>);
@@ -209,14 +206,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
 
     let suggestions = |f: fn(&Record) -> &str| by_frequency(all.iter().map(f));
     let stations = suggestions(|r| r.station.as_str());
-    let with_defaults = |mut used: Vec<String>, defaults: &[&str]| {
-        for d in defaults {
-            if !used.iter().any(|u| u == d) {
-                used.push(d.to_string());
-            }
-        }
-        used
-    };
     let history_fuels: Vec<String> = suggestions(|r| r.fuel.as_str()).into_iter().filter(|f| !is_known_fuel(f)).take(4).collect();
     let base_fuel = base.fuel.clone();
     let fuel_options = Memo::new(move |_| {
@@ -234,7 +223,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     });
     let custom_fuel = RwSignal::new(!base.fuel.is_empty() && !fuel_options.get_untracked().contains(&base.fuel));
     let station_fuels = RwSignal::new(Vec::<&'static str>::new());
-    let payments = with_defaults(suggestions(|r| r.payment.as_str()), store.t().payment_suggestions);
 
     let on_station_change = {
         let all = all.clone();
@@ -459,8 +447,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             address: text(address),
             lat,
             lng,
-            display_cons: parse_num(&display.get_untracked()),
-            payment: text(payment),
             notes: notes.get_untracked().trim().to_string(),
             created_at,
             demo,
@@ -769,25 +755,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                     }}
                 </div>
                 <label class="field">
-                    <span>{t.display_cons}" (L/100 km)"</span>
-                    <input
-                        inputmode="decimal"
-                        autocomplete="off"
-                        placeholder=t.optional
-                        prop:value=move || display.get()
-                        on:input=move |ev| display.set(event_target_value(&ev))
-                    />
-                </label>
-                <label class="field">
-                    <span>{t.payment}</span>
-                    <input
-                        list="dl-payment"
-                        autocomplete="off"
-                        prop:value=move || payment.get()
-                        on:input=move |ev| payment.set(event_target_value(&ev))
-                    />
-                </label>
-                <label class="field">
                     <span>{t.notes}</span>
                     <textarea
                         rows="2"
@@ -805,7 +772,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 })}
             </form>
             {datalist("dl-station", stations.clone())}
-            {datalist("dl-payment", payments.clone())}
         }
     })
     .into_any()

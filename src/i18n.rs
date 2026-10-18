@@ -87,7 +87,6 @@ pub struct Texts {
     pub no_records_in_period: &'static str,
     pub avg_consumption: &'static str,
     pub based_on_segments: &'static str,
-    pub display_only: &'static str,
     pub need_two_full: &'static str,
     pub avg_price: &'static str,
     pub cost_per_km: &'static str,
@@ -107,9 +106,6 @@ pub struct Texts {
     pub best_worst: &'static str,
     pub price_range: &'static str,
     pub cheapest: &'static str,
-    pub display_vs_calc: &'static str,
-    pub deviation: &'static str,
-    pub display_avg: &'static str,
     pub savings: &'static str,
     pub savings_sub: &'static str,
     pub chart_consumption: &'static str,
@@ -136,7 +132,6 @@ pub struct Texts {
     pub state_invalid: &'static str,
     pub badge_partial: &'static str,
     pub badge_missed: &'static str,
-    pub badge_display: &'static str,
     pub badge_saved: &'static str,
     pub badge_demo: &'static str,
     pub map: &'static str,
@@ -160,12 +155,10 @@ pub struct Texts {
     pub fuel: &'static str,
     pub other_fuel: &'static str,
     pub fuel_not_listed: &'static str,
-    pub display_cons: &'static str,
     pub station: &'static str,
     pub address: &'static str,
     pub locating: &'static str,
     pub remove: &'static str,
-    pub payment: &'static str,
     pub notes: &'static str,
     pub save: &'static str,
     pub cancel: &'static str,
@@ -240,7 +233,6 @@ pub struct Texts {
 
     pub weekdays: [&'static str; 7],
     pub months: [&'static str; 12],
-    pub payment_suggestions: &'static [&'static str],
 }
 
 pub const EN: Texts = Texts {
@@ -278,7 +270,6 @@ pub const EN: Texts = Texts {
     no_records_in_period: "No fill-ups in this period.",
     avg_consumption: "Average consumption",
     based_on_segments: "From {n} full-tank intervals over {km} km",
-    display_only: "No full-tank intervals yet · car display ∅ {v}",
     need_two_full: "Needs two full-tank fill-ups",
     avg_price: "Average price",
     cost_per_km: "Cost per km",
@@ -298,9 +289,6 @@ pub const EN: Texts = Texts {
     best_worst: "Best {best} · worst {worst}",
     price_range: "Price range",
     cheapest: "Cheapest:",
-    display_vs_calc: "Car display / calculated",
-    deviation: "Display deviates {v} %",
-    display_avg: "Car display ∅",
     savings: "Discounts",
     savings_sub: "Pump total minus amount paid",
     chart_consumption: "Consumption (L/100 km)",
@@ -327,7 +315,6 @@ pub const EN: Texts = Texts {
     state_invalid: "Check odometer",
     badge_partial: "Partial",
     badge_missed: "Previous missed",
-    badge_display: "Display {v}",
     badge_saved: "Saved {v}",
     badge_demo: "Demo",
     map: "Map",
@@ -351,12 +338,10 @@ pub const EN: Texts = Texts {
     fuel: "Fuel",
     other_fuel: "Other…",
     fuel_not_listed: "This station is not tagged with {fuel} on OpenStreetMap – please double-check.",
-    display_cons: "Car display",
     station: "Station",
     address: "Address / location",
     locating: "Locating…",
     remove: "Remove",
-    payment: "Payment",
     notes: "Notes",
     save: "Save",
     cancel: "Cancel",
@@ -431,7 +416,6 @@ pub const EN: Texts = Texts {
 
     weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-    payment_suggestions: &["Card", "Cash", "Apple Pay", "Fuel card"],
 };
 
 pub const ZH: Texts = Texts {
@@ -469,7 +453,6 @@ pub const ZH: Texts = Texts {
     no_records_in_period: "该时间段内没有记录。",
     avg_consumption: "平均油耗",
     based_on_segments: "基于 {n} 段加满区间，共 {km} km",
-    display_only: "暂无加满区间 · 车机平均 {v}",
     need_two_full: "至少需要两次加满才能计算",
     avg_price: "平均油价",
     cost_per_km: "每公里成本",
@@ -489,9 +472,6 @@ pub const ZH: Texts = Texts {
     best_worst: "最低 {best} · 最高 {worst}",
     price_range: "油价区间",
     cheapest: "最便宜：",
-    display_vs_calc: "车机 / 实测油耗",
-    deviation: "车机偏差 {v} %",
-    display_avg: "车机平均油耗",
     savings: "优惠",
     savings_sub: "机显金额减实付金额",
     chart_consumption: "油耗趋势（L/100 km）",
@@ -518,7 +498,6 @@ pub const ZH: Texts = Texts {
     state_invalid: "请检查里程数",
     badge_partial: "未加满",
     badge_missed: "上次漏记",
-    badge_display: "车机 {v}",
     badge_saved: "优惠 {v}",
     badge_demo: "示例",
     map: "地图",
@@ -542,12 +521,10 @@ pub const ZH: Texts = Texts {
     fuel: "油品",
     other_fuel: "其他…",
     fuel_not_listed: "OpenStreetMap 上这个加油站没有标注提供 {fuel}，请确认一下。",
-    display_cons: "车机油耗",
     station: "加油站",
     address: "地址 / 位置",
     locating: "定位中…",
     remove: "移除",
-    payment: "支付方式",
     notes: "备注",
     save: "保存",
     cancel: "取消",
@@ -622,7 +599,6 @@ pub const ZH: Texts = Texts {
 
     weekdays: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
     months: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
-    payment_suggestions: &["微信", "支付宝", "银行卡", "现金", "加油卡"],
 };
 
 pub const DE: Texts = Texts {
@@ -660,7 +636,6 @@ pub const DE: Texts = Texts {
     no_records_in_period: "Keine Tankvorgänge in diesem Zeitraum.",
     avg_consumption: "Durchschnittsverbrauch",
     based_on_segments: "Aus {n} Vollbetankungs-Intervallen über {km} km",
-    display_only: "Noch keine Vollbetankungs-Intervalle · Bordcomputer ∅ {v}",
     need_two_full: "Benötigt zwei Vollbetankungen",
     avg_price: "Durchschnittspreis",
     cost_per_km: "Kosten pro km",
@@ -680,9 +655,6 @@ pub const DE: Texts = Texts {
     best_worst: "Bester {best} · schlechtester {worst}",
     price_range: "Preisspanne",
     cheapest: "Am günstigsten:",
-    display_vs_calc: "Bordcomputer / berechnet",
-    deviation: "Anzeige weicht {v} % ab",
-    display_avg: "Bordcomputer ∅",
     savings: "Rabatte",
     savings_sub: "Zapfsäulenbetrag minus bezahlt",
     chart_consumption: "Verbrauch (L/100 km)",
@@ -709,7 +681,6 @@ pub const DE: Texts = Texts {
     state_invalid: "Kilometerstand prüfen",
     badge_partial: "Teilbetankung",
     badge_missed: "Vorherige fehlt",
-    badge_display: "Anzeige {v}",
     badge_saved: "Gespart {v}",
     badge_demo: "Beispiel",
     map: "Karte",
@@ -733,12 +704,10 @@ pub const DE: Texts = Texts {
     fuel: "Kraftstoff",
     other_fuel: "Andere…",
     fuel_not_listed: "Diese Tankstelle ist in OpenStreetMap nicht mit {fuel} markiert – bitte prüfen.",
-    display_cons: "Bordcomputer",
     station: "Tankstelle",
     address: "Adresse / Ort",
     locating: "Orte…",
     remove: "Entfernen",
-    payment: "Zahlungsart",
     notes: "Notizen",
     save: "Speichern",
     cancel: "Abbrechen",
@@ -813,7 +782,6 @@ pub const DE: Texts = Texts {
 
     weekdays: ["So.", "Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa."],
     months: ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez."],
-    payment_suggestions: &["EC-Karte", "Kreditkarte", "Bar", "Apple Pay", "Tankkarte"],
 };
 
 #[cfg(test)]
@@ -835,7 +803,7 @@ mod tests {
 
     #[test]
     fn placeholders_match_across_languages() {
-        let pick: [fn(&Texts) -> &'static str; 16] = [
+        let pick: [fn(&Texts) -> &'static str; 15] = [
             |t| t.fuel_not_listed,
             |t| t.pick_station_near,
             |t| t.no_nearby_near,
@@ -851,7 +819,6 @@ mod tests {
             |t| t.confirm_odo_higher,
             |t| t.confirm_delete_vehicle,
             |t| t.station_recognized,
-            |t| t.deviation,
         ];
         let holes = |s: &str| {
             let mut v: Vec<String> = s.split('{').skip(1).filter_map(|p| p.split_once('}')).map(|p| p.0.to_string()).collect();
