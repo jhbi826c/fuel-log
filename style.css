@@ -1296,3 +1296,12 @@ td.name {
 .card > .hint + .btn {
   margin-top: 10px;
 }
+
+.pick-main .renamed {
+  font-weight: 400;
+}
+
+.pick-main .badge.own {
+  margin-left: 6px;
+  vertical-align: 1px;
+}

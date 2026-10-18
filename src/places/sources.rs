@@ -98,8 +98,11 @@ pub fn parse_overpass(v: &Value, origin: Origin) -> Result<Vec<Station>, String>
                 dist_km: distance_km(origin, (lat, lng)),
                 fuels,
                 fuel_tagged,
+                renamed_from: None,
+                own_name: None,
             })
         })
+        .map(Station::apply_rebrands)
         .collect())
 }
 
@@ -140,8 +143,11 @@ pub fn parse_nominatim_search(v: &Value, origin: Origin) -> Result<Vec<Station>,
                 dist_km: distance_km(origin, (lat, lng)),
                 fuels,
                 fuel_tagged,
+                renamed_from: None,
+                own_name: None,
             })
         })
+        .map(Station::apply_rebrands)
         .collect())
 }
 

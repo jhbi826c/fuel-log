@@ -21,7 +21,6 @@ enum Trio {
     Total,
 }
 
-const KNOWN_STATION_KM: f64 = 0.15;
 const NEARBY_LIMIT: usize = 10;
 
 /// Distinct non-empty values, most frequent first.
@@ -41,6 +40,19 @@ fn datalist(id: &'static str, values: Vec<String>) -> impl IntoView {
             {values.into_iter().map(|v| view! { <option value=v></option> }).collect_view()}
         </datalist>
     }
+}
+
+/// Applies the station names from your records to search results.
+fn with_own_names(mut list: Vec<Station>, all: &[Record]) -> Vec<Station> {
+    let known: Vec<places::Known> = all
+        .iter()
+        .filter_map(|r| {
+            let (lat, lng) = r.coords()?;
+            Some(places::Known { lat, lng, name: &r.station, address: &r.address, date: &r.date })
+        })
+        .collect();
+    places::apply_own_names(&mut list, &known);
+    list
 }
 
 #[component]
@@ -64,6 +76,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     }
     let editing = existing.is_some();
     let all = store.data.with_untracked(|d| d.records.iter().filter(|r| !r.deleted).cloned().collect::<Vec<_>>());
+    let history = StoredValue::new(all.clone());
     let active = store.active_vehicle();
     let last_of_vehicle = {
         let mut rs: Vec<Record> = all.iter().filter(|r| r.vehicle_id == active).cloned().collect();
@@ -289,7 +302,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                     .iter()
                     .filter(|r| !r.station.is_empty())
                     .filter_map(|r| Some((distance_km(c, r.coords()?), r)))
-                    .filter(|(d, _)| *d < KNOWN_STATION_KM)
+                    .filter(|(d, _)| *d < places::SAME_STATION_KM)
                     .min_by(|a, b| a.0.total_cmp(&b.0));
                 if let Some((_, r)) = known
                     && station.get_untracked().is_empty()
@@ -303,7 +316,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 match found {
                     Ok(f) => {
                         nearby_place.set(None);
-                        nearby.set(Some(f));
+                        nearby.set(Some((f.0, history.with_value(|all| with_own_names(f.1, all)))));
                     }
                     Err(e) => ui.error(format!("{} ({e})", t.nearby_failed)),
                 }
@@ -326,7 +339,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 Ok(Some(point)) => match places::nearby(point, NEARBY_LIMIT, &wanted).await {
                     Ok(found) => {
                         nearby_place.set(Some(q.clone()));
-                        nearby.set(Some(found));
+                        nearby.set(Some((found.0, history.with_value(|all| with_own_names(found.1, all)))));
                     }
                     Err(e) => ui.error(format!("{} ({e})", t.nearby_failed)),
                 },
@@ -366,7 +379,14 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                             view! {
                                 <button type="button" class="pick" on:click=move |_| apply_station(&pick)>
                                     <span class="pick-main">
-                                        <b>{title}</b>
+                                        <b>
+                                            {title}
+                                            {match (&st.own_name, st.renamed_from) {
+                                                (Some(_), _) => Some(view! { <small class="badge good own">{t.own_name_badge}</small> }.into_any()),
+                                                (None, Some(o)) => Some(view! { <small class="muted renamed">" ("{o}")"</small> }.into_any()),
+                                                (None, None) => None,
+                                            }}
+                                        </b>
                                         <small class="muted">{st.address.clone()}</small>
                                         {if st.fuels.is_empty() {
                                             (!st.fuel_tagged).then(|| view! { <small class="muted">{t.fuels_unknown}</small> }.into_any())
