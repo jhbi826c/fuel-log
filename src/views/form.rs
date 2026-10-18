@@ -108,6 +108,8 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     let order = RwSignal::new(if editing { vec![Trio::Total, Trio::Liters, Trio::Price] } else { Vec::new() });
     let computed = RwSignal::new(None::<Trio>);
     let locating = RwSignal::new(false);
+    let searching = RwSignal::new(false);
+    let nearby_place = RwSignal::new(None::<String>);
     let error = RwSignal::new(None::<String>);
 
     let others = {
@@ -292,7 +294,10 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                     ui.toast(fill(t.station_recognized, &[("name", &r.station)]));
                 }
                 match found {
-                    Ok(f) => nearby.set(Some(f)),
+                    Ok(f) => {
+                        nearby_place.set(None);
+                        nearby.set(Some(f));
+                    }
                     Err(e) => ui.error(format!("{} ({e})", t.nearby_failed)),
                 }
                 locating.set(false);
@@ -300,16 +305,50 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         }
     };
 
+    let search_here = move || {
+        let q = address.get_untracked().trim().to_string();
+        if q.is_empty() {
+            ui.error(store.t().enter_address);
+            return;
+        }
+        searching.set(true);
+        spawn_local(async move {
+            let t = store.t();
+            let wanted = store.vehicle_fuels(&vehicle.get_untracked());
+            match places::geocode(&q).await {
+                Ok(Some(point)) => match places::nearby(point, NEARBY_LIMIT, &wanted).await {
+                    Ok(found) => {
+                        nearby_place.set(Some(q.clone()));
+                        nearby.set(Some(found));
+                    }
+                    Err(e) => ui.error(format!("{} ({e})", t.nearby_failed)),
+                },
+                Ok(None) => ui.error(t.place_not_found),
+                Err(e) => ui.error(format!("{} ({e})", t.place_not_found)),
+            }
+            searching.set(false);
+        });
+    };
+
     let picker = move || {
         let (km, list) = nearby.get()?;
         let t = store.t();
         if list.is_empty() {
-            return Some(view! { <p class="hint">{fill(t.no_nearby, &[("km", &km)])}</p> }.into_any());
+            let text = match nearby_place.get() {
+                Some(place) => fill(t.no_nearby_near, &[("km", &km), ("place", &place)]),
+                None => fill(t.no_nearby, &[("km", &km)]),
+            };
+            return Some(view! { <p class="hint">{text}</p> }.into_any());
         }
         Some(
             view! {
                 <div class="picker">
-                    <p class="hint">{fill(t.pick_station, &[("km", &km)])}</p>
+                    <p class="hint">
+                        {match nearby_place.get() {
+                            Some(place) => fill(t.pick_station_near, &[("km", &km), ("place", &place)]),
+                            None => fill(t.pick_station, &[("km", &km)]),
+                        }}
+                    </p>
                     {list
                         .into_iter()
                         .map(|st| {
@@ -608,11 +647,28 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 {picker}
                 <label class="field">
                     <span>{t.address}</span>
-                    <input
-                        autocomplete="off"
-                        prop:value=move || address.get()
-                        on:input=move |ev| address.set(event_target_value(&ev))
-                    />
+                    <div class="input-row">
+                        <input
+                            autocomplete="off"
+                            prop:value=move || address.get()
+                            on:input=move |ev| address.set(event_target_value(&ev))
+                            on:keydown=move |ev| {
+                                if ev.key() == "Enter" {
+                                    ev.prevent_default();
+                                    search_here();
+                                }
+                            }
+                        />
+                        <button
+                            type="button"
+                            class="btn"
+                            disabled=move || searching.get()
+                            on:click=move |_| search_here()
+                        >
+                            {icon(Icon::Search)}
+                            {move || if searching.get() { store.t().searching } else { store.t().search_here }}
+                        </button>
+                    </div>
                 </label>
                 {move || {
                     coords

@@ -1,7 +1,7 @@
 pub mod geo;
 mod sources;
 
-pub use sources::reverse_geocode;
+pub use sources::{geocode, reverse_geocode};
 
 use crate::model::is_known_fuel;
 

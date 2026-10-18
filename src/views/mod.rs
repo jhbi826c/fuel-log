@@ -21,6 +21,7 @@ pub enum Icon {
     Sync,
     Pin,
     Locate,
+    Search,
 }
 
 impl Icon {
@@ -35,6 +36,7 @@ impl Icon {
             Self::Sync => r#"<path d="M21 12a9 9 0 0 1-15.4 6.4L3 16M3 12a9 9 0 0 1 15.4-6.4L21 8M21 3v5h-5M3 21v-5h5"/>"#,
             Self::Pin => r#"<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>"#,
             Self::Locate => r#"<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>"#,
+            Self::Search => r#"<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>"#,
         }
     }
 }

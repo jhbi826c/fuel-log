@@ -15,7 +15,7 @@ UI languages: English, 中文, Deutsch.
   - Car display compared with the calculated value, and discounts saved.
 - **Charts**: consumption trend, price trend and monthly spending, with touch-friendly tooltips.
 - **Tables**: per year, per station and per fuel type.
-- **Station picker**: "Nearby" in the fill-up form fills in the address (Nominatim) and lists the nearest fuel stations from OpenStreetMap (within 2 km, widening to 5 and 10 km when fewer than 3 are found), with the fuel types each station is tagged with; picking one fills in name, address and location.
+- **Station picker**: "Nearby" in the fill-up form uses your location (and fills in the address via Nominatim); "Search here" uses the address or place typed into the address field. Both list the nearest fuel stations from OpenStreetMap (within 2 km, widening to 5 and 10 km when fewer than 3 are found), with the fuel types each station is tagged with; picking one fills in name, address and location.
 - **Fuel types**: picked from a fixed list (Super E10, Super E5, Super Plus, Super 100, Diesel, Premium Diesel, LPG, CNG, E85) or entered freely. Each vehicle can be limited to the fuels it uses; "Nearby" then hides stations tagged with other fuels only, and the form offers only those fuels. Types the chosen station is not tagged with are dimmed.
 - **Map links**: Google Maps, Apple Maps, OpenStreetMap or OsmAnd.
 - **Several vehicles.**

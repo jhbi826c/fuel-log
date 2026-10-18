@@ -181,6 +181,18 @@ pub async fn reverse_geocode((lat, lng): Origin) -> Result<Option<String>, Strin
     Ok(parse_reverse(&v))
 }
 
+/// Position of the best match in a Nominatim search result.
+pub fn parse_geocode(v: &Value) -> Option<(f64, f64)> {
+    let p = v.as_array()?.first()?;
+    Some((num(&p["lat"])?, num(&p["lon"])?))
+}
+
+/// Position of an address or place name.
+pub async fn geocode(q: &str) -> Result<Option<(f64, f64)>, String> {
+    let v = get_json(&format!("{NOMINATIM}/search?q={}&format=jsonv2&limit=1", enc(q.trim()))).await?;
+    Ok(parse_geocode(&v))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +224,10 @@ mod tests {
         let r = json!({"address": {"road": "Am Lagerplatz", "house_number": "2", "postcode": "01099", "city": "Dresden"}});
         assert_eq!(parse_reverse(&r).as_deref(), Some("Am Lagerplatz 2, 01099 Dresden"));
         assert_eq!(parse_reverse(&json!({"error": "Unable to geocode"})), None);
+
+        let g = json!([{"lat": "50.7726", "lon": "14.2128", "display_name": "Děčín, okres Děčín, Ústecký kraj, Česko"}]);
+        assert_eq!(parse_geocode(&g), Some((50.7726, 14.2128)));
+        assert_eq!(parse_geocode(&json!([])), None);
     }
 
     #[test]
