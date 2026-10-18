@@ -1,6 +1,7 @@
+use chrono::NaiveDate;
 use leptos::prelude::*;
 
-use super::EmptyState;
+use super::{EmptyState, Icon, icon};
 use crate::app::{Period, Ui};
 use crate::charts::{Bar, BarChart, LineChart};
 use crate::format::{self, money, money_opt, num, opt};
@@ -34,25 +35,77 @@ pub fn Overview() -> impl IntoView {
         }
         let mut periods = vec![(Period::All, t.period_all.to_string()), (Period::Months(3), t.period_3m.to_string()), (Period::Months(12), t.period_12m.to_string())];
         periods.extend(years.get().into_iter().map(|y| (Period::Year(y), y.to_string())));
+        let is_custom = move || matches!(ui.period.get(), Period::Custom(..));
         view! {
-            <div class="chips" role="tablist">
-                {periods
-                    .into_iter()
-                    .map(|(p, label)| {
-                        view! {
-                            <button
-                                class=move || if ui.period.get() == p { "chip active" } else { "chip" }
-                                on:click=move |_| ui.period.set(p)
-                            >
-                                {label}
-                            </button>
+            <div class="period-bar">
+                <div class="chips" role="tablist">
+                    {periods
+                        .into_iter()
+                        .map(|(p, label)| {
+                            view! {
+                                <button
+                                    class=move || if ui.period.get() == p { "chip active" } else { "chip" }
+                                    on:click=move |_| ui.period.set(p)
+                                >
+                                    {label}
+                                </button>
+                            }
+                        })
+                        .collect_view()}
+                </div>
+                <button
+                    class=move || if is_custom() { "chip custom-chip active" } else { "chip custom-chip" }
+                    aria-pressed=move || is_custom().to_string()
+                    on:click=move |_| {
+                        if !is_custom() {
+                            ui.period.set(Period::Custom(None, None));
                         }
-                    })
-                    .collect_view()}
+                    }
+                >
+                    {icon(Icon::Calendar)}
+                    <span>{t.period_custom}</span>
+                </button>
             </div>
+            {move || is_custom().then(|| view! { <CustomRange /> })}
             <StatsView stats=stats.get() />
         }
         .into_any()
+    }
+}
+
+/// From/to date pickers for `Period::Custom`.
+#[component]
+fn CustomRange() -> impl IntoView {
+    let store = expect_context::<Store>();
+    let ui = expect_context::<Ui>();
+    let t = store.t();
+    let dates = move || match ui.period.get() {
+        Period::Custom(f, to) => (f, to),
+        _ => (None, None),
+    };
+    let fmt = |d: Option<NaiveDate>| d.map(|d| d.format("%Y-%m-%d").to_string()).unwrap_or_default();
+    let parse = |s: String| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok();
+    view! {
+        <div class="card custom-range">
+            <label class="field">
+                <span>{t.range_from}</span>
+                <input
+                    type="date"
+                    prop:value=move || fmt(dates().0)
+                    max=move || fmt(dates().1)
+                    on:input=move |ev| ui.period.set(Period::Custom(parse(event_target_value(&ev)), dates().1))
+                />
+            </label>
+            <label class="field">
+                <span>{t.range_to}</span>
+                <input
+                    type="date"
+                    prop:value=move || fmt(dates().1)
+                    min=move || fmt(dates().0)
+                    on:input=move |ev| ui.period.set(Period::Custom(dates().0, parse(event_target_value(&ev))))
+                />
+            </label>
+        </div>
     }
 }
 

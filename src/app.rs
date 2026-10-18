@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use chrono::Months;
+use chrono::{Months, NaiveDate};
 use leptos::ev;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -43,6 +43,12 @@ pub enum Period {
     All,
     Months(u32),
     Year(i32),
+    /// User-picked dates, both inclusive; `None` leaves that side open.
+    Custom(Option<NaiveDate>, Option<NaiveDate>),
+}
+
+fn ymd(d: NaiveDate) -> String {
+    d.format("%Y-%m-%d").to_string()
 }
 
 impl Period {
@@ -50,12 +56,17 @@ impl Period {
         match self {
             Self::All => Range::default(),
             Self::Months(n) => Range {
-                from: parse_dt(today)
-                    .and_then(|d| d.date().checked_sub_months(Months::new(n)))
-                    .map(|d| d.format("%Y-%m-%d").to_string()),
+                from: parse_dt(today).and_then(|d| d.date().checked_sub_months(Months::new(n))).map(ymd),
                 to: None,
             },
             Self::Year(y) => Range { from: Some(format!("{y:04}-01-01")), to: Some(format!("{:04}-01-01", y + 1)) },
+            Self::Custom(from, to) => {
+                let (from, to) = match (from, to) {
+                    (Some(f), Some(t)) if f > t => (Some(t), Some(f)),
+                    other => other,
+                };
+                Range { from: from.map(ymd), to: to.and_then(|d| d.succ_opt()).map(ymd) }
+            }
         }
     }
 }
@@ -396,5 +407,10 @@ mod tests {
         assert_eq!(r.from.as_deref(), Some("2026-02-28"));
         let y = Period::Year(2025).range("2026-05-31T10:00");
         assert!(y.contains("2025-12-31T23:59") && !y.contains("2026-01-01T00:00"));
+        let d = |s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok();
+        let c = Period::Custom(d("2026-03-10"), d("2026-02-01")).range("2026-05-31T10:00");
+        assert!(c.contains("2026-02-01T00:00") && c.contains("2026-03-10T23:59") && !c.contains("2026-03-11T00:00"));
+        let open = Period::Custom(d("2026-03-10"), None).range("2026-05-31T10:00");
+        assert!(open.contains("2030-01-01T00:00") && !open.contains("2026-03-09T23:59"));
     }
 }

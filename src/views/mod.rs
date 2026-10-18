@@ -22,6 +22,7 @@ pub enum Icon {
     Pin,
     Locate,
     Search,
+    Calendar,
 }
 
 impl Icon {
@@ -37,6 +38,7 @@ impl Icon {
             Self::Pin => r#"<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>"#,
             Self::Locate => r#"<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>"#,
             Self::Search => r#"<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>"#,
+            Self::Calendar => r#"<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>"#,
         }
     }
 }

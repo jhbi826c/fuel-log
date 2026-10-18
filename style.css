@@ -433,7 +433,8 @@ select {
   height: 44px;
 }
 
-input[type="datetime-local"] {
+input[type="datetime-local"],
+input[type="date"] {
   -webkit-appearance: none;
   appearance: none;
   display: block;
@@ -441,7 +442,8 @@ input[type="datetime-local"] {
   text-align: left;
 }
 
-input[type="datetime-local"]::-webkit-date-and-time-value {
+input[type="datetime-local"]::-webkit-date-and-time-value,
+input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
   margin: 0;
 }
@@ -641,6 +643,38 @@ input[type="checkbox"] {
   border-color: var(--accent);
   color: var(--on-accent);
   font-weight: 600;
+}
+
+/* Scrollable preset chips with the custom-range chip pinned on the right. */
+.period-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.period-bar .chips {
+  flex: 1;
+  min-width: 0;
+  margin-right: 0;
+  padding-right: 0;
+}
+
+.custom-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+}
+
+.custom-chip .ic {
+  width: 16px;
+  height: 16px;
+}
+
+.custom-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .label {
@@ -1106,6 +1140,11 @@ td.name {
 
 .card:not(.form) .field + .field {
   margin-top: 12px;
+}
+
+/* Side-by-side fields; beats the stacked-field spacing above. */
+.card.custom-range .field + .field {
+  margin-top: 0;
 }
 
 .card > .switch {
