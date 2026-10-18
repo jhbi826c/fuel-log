@@ -7,7 +7,7 @@ use super::{Icon, icon};
 use crate::app::Ui;
 use crate::format::{self, input_num, money, num, parse_num};
 use crate::i18n::fill;
-use crate::model::{FUEL_TYPES, Record, is_known_fuel};
+use crate::model::{FUEL_TYPES, Record, is_known_fuel, usable_fuels};
 use crate::places::geo::distance_km;
 use crate::places::{self, Station};
 use crate::stats::{SegState, analyze, parse_dt, sort_records};
@@ -91,7 +91,8 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     let vehicle = RwSignal::new(base.vehicle_id.clone());
     let date = RwSignal::new(base.date.clone());
     let odo = RwSignal::new(s(base.odometer, 1));
-    let trip = RwSignal::new(String::new());
+    let trip = RwSignal::new(s(base.trip, 1));
+    let trip_explicit = RwSignal::new(base.trip.is_some());
     let liters = RwSignal::new(s(base.liters, 2));
     let price = RwSignal::new(s(base.price, 3));
     let total = RwSignal::new(s(base.total, 2));
@@ -133,6 +134,12 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     });
     let prev_odo = move || neighbors.with_untracked(|(p, _)| p.as_ref().and_then(|p| p.odometer));
     let sync_trip = move || {
+        if trip_explicit.get_untracked() {
+            if let (Some(p), Some(t)) = (prev_odo(), parse_num(&trip.get_untracked())) {
+                odo.set(input_num(l, p + t, 1));
+            }
+            return;
+        }
         trip.set(match (prev_odo(), parse_num(&odo.get_untracked())) {
             (Some(p), Some(o)) => input_num(l, o - p, 1),
             _ => String::new(),
@@ -181,7 +188,8 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 id: rec_id.clone(),
                 vehicle_id: vehicle.get(),
                 date: date.get(),
-                odometer: Some(parse_num(&odo.get())?),
+                odometer: parse_num(&odo.get()),
+                trip: if trip_explicit.get() { parse_num(&trip.get()) } else { None },
                 liters: Some(parse_num(&liters.get())?),
                 price: parse_num(&price.get()),
                 total: parse_num(&total.get()),
@@ -190,6 +198,9 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 missed_previous: missed.get(),
                 ..Default::default()
             };
+            if cand.odometer.is_none() && cand.trip.is_none() {
+                return None;
+            }
             let mut rs = others.get();
             rs.push(cand);
             analyze(&rs).into_iter().find(|e| e.rec.id == rec_id)
@@ -212,10 +223,11 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         let mine = store.data.with(|d| {
             d.vehicles.iter().find(|v| v.id == vehicle.get()).map(|v| v.fuels.clone()).unwrap_or_default()
         });
+        let usable = usable_fuels(&mine);
         let mut opts: Vec<String> = FUEL_TYPES
             .iter()
             .map(|(name, _)| name.to_string())
-            .filter(|n| mine.is_empty() || mine.contains(n) || *n == base_fuel)
+            .filter(|n| mine.is_empty() || usable.contains(&n.as_str()) || *n == base_fuel)
             .collect();
         opts.extend(history_fuels.iter().filter(|f| !opts.contains(f)).cloned().collect::<Vec<_>>());
         opts
@@ -252,6 +264,13 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         }
         coords.set(Some((st.lat, st.lng)));
         station_fuels.set(st.fuels.clone());
+        if !st.fuels.is_empty() && !fuel.with_untracked(|f| st.fuels.contains(&f.as_str())) {
+            let usable = usable_fuels(&store.vehicle_fuels(&vehicle.get_untracked()));
+            if let Some(f) = usable.into_iter().find(|f| st.fuels.contains(f)) {
+                fuel.set(f.to_string());
+                custom_fuel.set(false);
+            }
+        }
         nearby.set(None);
     };
 
@@ -391,9 +410,11 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         if parse_dt(&d).is_none() {
             return fail(t.err_date);
         }
-        let Some(o) = parse_num(&odo.get_untracked()).filter(|v| *v >= 0.0) else {
+        let o = parse_num(&odo.get_untracked()).filter(|v| *v >= 0.0);
+        let tr = if trip_explicit.get_untracked() { parse_num(&trip.get_untracked()).filter(|v| *v > 0.0) } else { None };
+        if o.is_none() && tr.is_none() {
             return fail(t.err_odometer);
-        };
+        }
         let Some(lt) = parse_num(&liters.get_untracked()).filter(|v| *v > 0.0) else {
             return fail(t.err_liters);
         };
@@ -406,13 +427,13 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             return fail(t.err_amount);
         }
         let (prev, next) = neighbors.get_untracked();
-        if let Some(p) = prev.and_then(|p| p.odometer)
+        if let (Some(o), Some(p)) = (o, prev.and_then(|p| p.odometer))
             && o <= p
             && !web::confirm(&fill(t.confirm_odo_lower, &[("km", &num(l, p, 0))]))
         {
             return;
         }
-        if let Some(n) = next.and_then(|n| n.odometer)
+        if let (Some(o), Some(n)) = (o, next.and_then(|n| n.odometer))
             && o >= n
             && !web::confirm(&fill(t.confirm_odo_higher, &[("km", &num(l, n, 0))]))
         {
@@ -425,7 +446,8 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             id: rec_id.clone(),
             vehicle_id: v.clone(),
             date: d,
-            odometer: Some(o),
+            odometer: o,
+            trip: tr,
             liters: Some(lt),
             price: pr,
             total: tot,
@@ -556,13 +578,13 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                         <input
                             inputmode="decimal"
                             autocomplete="off"
-                            required
                             placeholder=move || {
                                 neighbors.with(|(p, _)| p.as_ref().and_then(|p| p.odometer)).map(|o| format!("> {}", num(l, o, 0)))
                             }
                             prop:value=move || odo.get()
                             on:input=move |ev| {
                                 odo.set(event_target_value(&ev));
+                                trip_explicit.set(false);
                                 sync_trip();
                             }
                         />
@@ -577,6 +599,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                         prop:value=move || trip.get()
                         on:input=move |ev| {
                             let v = event_target_value(&ev);
+                            trip_explicit.set(!v.trim().is_empty());
                             if let (Some(p), Some(tv)) = (prev_odo(), parse_num(&v)) {
                                 odo.set(input_num(l, p + tv, 1));
                             }

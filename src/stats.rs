@@ -16,14 +16,13 @@ pub enum SegState {
     Partial,
     /// Full tank closing a segment.
     Ok,
-    /// Full tank, but the odometer did not increase.
+    /// Full tank, but the distance is unknown or did not increase.
     Invalid,
 }
 
 /// Distance and fuel between two full tanks.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Segment {
-    pub from_date: String,
     pub dist: f64,
     pub liters: f64,
     pub cost: f64,
@@ -56,57 +55,67 @@ pub fn analyze(records: &[Record]) -> Vec<Entry> {
     sort_records(&mut recs);
 
     let mut out: Vec<Entry> = Vec::with_capacity(recs.len());
-    let mut anchor: Option<(String, f64)> = None;
-    let (mut acc_l, mut acc_c, mut fills) = (0.0, 0.0, 0usize);
+    // Odometer at the last full tank (None when only trip distances are known).
+    let mut anchor: Option<Option<f64>> = None;
+    let (mut acc_l, mut acc_c, mut acc_d, mut acc_known, mut fills) = (0.0, 0.0, 0.0, true, 0usize);
 
     for r in recs {
         let cost = r.cost();
+        let liters = r.liters.unwrap_or(0.0);
         let unit_price = r.liters.filter(|l| *l > 0.0).map(|l| cost / l);
-        let trip = match (out.last().and_then(|p| p.rec.odometer), r.odometer) {
+        let odo_trip = match (out.last().and_then(|p| p.rec.odometer), r.odometer) {
             (Some(a), Some(b)) => Some(b - a),
             _ => None,
         };
+        let trip = r.trip.or(odo_trip);
         if r.missed_previous {
             anchor = None;
         }
 
         let mut seg = None;
-        let state = match (anchor.take(), r.odometer) {
-            (Some((from_date, from_odo)), Some(odo)) => {
-                acc_l += r.liters.unwrap_or(0.0);
+        let state = match anchor.take() {
+            Some(from_odo) => {
+                acc_l += liters;
                 acc_c += cost;
                 fills += 1;
+                match trip {
+                    Some(t) => acc_d += t,
+                    None => acc_known = false,
+                }
                 if r.full {
-                    let dist = odo - from_odo;
-                    let state = if dist > 0.0 && acc_l > 0.0 {
-                        seg = Some(Segment {
-                            from_date,
-                            dist,
-                            liters: acc_l,
-                            cost: acc_c,
-                            cons: acc_l / dist * 100.0,
-                            fills,
-                        });
-                        SegState::Ok
-                    } else {
-                        SegState::Invalid
+                    let dist = match (from_odo, r.odometer) {
+                        (Some(a), Some(b)) => Some(b - a),
+                        _ => acc_known.then_some(acc_d),
                     };
-                    anchor = Some((r.date.clone(), odo));
-                    (acc_l, acc_c, fills) = (0.0, 0.0, 0);
+                    let state = match dist {
+                        Some(dist) if dist > 0.0 && acc_l > 0.0 => {
+                            seg = Some(Segment { dist, liters: acc_l, cost: acc_c, cons: acc_l / dist * 100.0, fills });
+                            SegState::Ok
+                        }
+                        _ => SegState::Invalid,
+                    };
+                    anchor = Some(r.odometer);
+                    (acc_l, acc_c, acc_d, acc_known, fills) = (0.0, 0.0, 0.0, true, 0);
                     state
                 } else {
-                    anchor = Some((from_date, from_odo));
+                    anchor = Some(from_odo);
                     SegState::Partial
                 }
             }
-            (_, odo) => {
-                (acc_l, acc_c, fills) = (0.0, 0.0, 0);
-                match odo {
-                    Some(odo) if r.full => {
-                        anchor = Some((r.date.clone(), odo));
-                        SegState::Start
+            None => {
+                (acc_l, acc_c, acc_d, acc_known, fills) = (0.0, 0.0, 0.0, true, 0);
+                if r.full {
+                    anchor = Some(r.odometer);
+                    // A full tank with a known trip measures the distance since the previous (unrecorded) full tank.
+                    match r.trip.filter(|t| *t > 0.0) {
+                        Some(dist) if liters > 0.0 => {
+                            seg = Some(Segment { dist, liters, cost, cons: liters / dist * 100.0, fills: 1 });
+                            SegState::Ok
+                        }
+                        _ => SegState::Start,
                     }
-                    _ => SegState::NoStart,
+                } else {
+                    SegState::NoStart
                 }
             }
         };
@@ -417,6 +426,55 @@ mod tests {
 
     fn close(a: f64, b: f64) -> bool {
         (a - b).abs() < 1e-9
+    }
+
+    fn trip_rec(id: &str, date: &str, trip: f64, liters: f64, full: bool) -> Record {
+        Record {
+            id: id.into(),
+            date: format!("{date}T10:00"),
+            trip: Some(trip),
+            liters: Some(liters),
+            total: Some(liters * 1.8),
+            full,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn trip_distances_without_odometer() {
+        let e = analyze(&[
+            trip_rec("a", "2026-01-01", 500.0, 30.0, true),
+            trip_rec("b", "2026-01-08", 200.0, 10.0, false),
+            trip_rec("c", "2026-01-15", 300.0, 20.0, true),
+        ]);
+        assert_eq!(e[0].state, SegState::Ok);
+        assert!(close(e[0].seg.as_ref().unwrap().cons, 6.0));
+        assert_eq!(e[1].state, SegState::Partial);
+        let g = e[2].seg.as_ref().unwrap();
+        assert!(close(g.dist, 500.0));
+        assert!(close(g.cons, 6.0));
+        assert_eq!(e[2].trip, Some(300.0));
+    }
+
+    #[test]
+    fn first_full_tank_with_trip_and_odometer() {
+        let mut a = rec("a", "2026-01-01", 1000.0, 35.0, 63.0, true);
+        a.trip = Some(500.0);
+        let e = analyze(&[a, rec("b", "2026-01-15", 1600.0, 36.0, 64.0, true)]);
+        assert!(close(e[0].seg.as_ref().unwrap().cons, 7.0));
+        assert!(close(e[1].seg.as_ref().unwrap().cons, 6.0));
+        let s = compute(&e, &Range::default());
+        assert_eq!(s.seg_count, 2);
+        assert!(close(s.avg_cons.unwrap(), 71.0 / 1100.0 * 100.0));
+    }
+
+    #[test]
+    fn unknown_distance_is_invalid() {
+        let mut b = rec("b", "2026-01-15", 0.0, 30.0, 54.0, true);
+        b.odometer = None;
+        b.trip = None;
+        let e = analyze(&[rec("a", "2026-01-01", 1000.0, 40.0, 70.0, true), b]);
+        assert_eq!(e[1].state, SegState::Invalid);
     }
 
     #[test]

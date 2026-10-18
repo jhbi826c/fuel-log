@@ -140,8 +140,14 @@ fn record_card(e: Entry, t: &'static Texts, l: Lang, cur: &str, provider: MapPro
             </div>
             <div class="rec-row">
                 <span class="muted">
-                    {r.odometer.map(|o| num(l, o, 0))}" km"
-                    {e.trip.filter(|t| *t > 0.0).map(|t| format!(" · +{} km", num(l, t, 0)))}
+                    {[
+                        r.odometer.map(|o| format!("{} km", num(l, o, 0))),
+                        e.trip.filter(|t| *t > 0.0).map(|t| format!("+{} km", num(l, t, 0))),
+                    ]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<_>>()
+                        .join(" · ")}
                 </span>
                 <span class=cons_class>{cons_text}</span>
             </div>

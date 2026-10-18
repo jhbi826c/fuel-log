@@ -3,7 +3,7 @@ mod sources;
 
 pub use sources::{geocode, reverse_geocode};
 
-use crate::model::is_known_fuel;
+use crate::model::usable_fuels;
 
 /// A fuel station from OpenStreetMap.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -38,10 +38,10 @@ impl Station {
         if self.name.is_empty() { self.brand.clone() } else { self.name.clone() }
     }
 
-    /// False only when the station's fuel tags rule out all `wanted` fuels.
+    /// False only when the station's fuel tags rule out every fuel usable with `wanted`.
     pub fn may_offer(&self, wanted: &[String]) -> bool {
-        let known: Vec<&String> = wanted.iter().filter(|w| is_known_fuel(w)).collect();
-        known.is_empty() || !self.fuel_tagged || self.fuels.iter().any(|f| known.iter().any(|w| w == f))
+        let usable = usable_fuels(wanted);
+        usable.is_empty() || !self.fuel_tagged || self.fuels.iter().any(|f| usable.contains(f))
     }
 }
 
@@ -95,6 +95,9 @@ mod tests {
         let untagged = Station::default();
         assert!(diesel_only.may_offer(&want(&["Diesel"])));
         assert!(!diesel_only.may_offer(&want(&["Super E10", "Super E5"])));
+        let czech = Station { fuels: vec!["Super E5", "Super Plus", "Diesel"], fuel_tagged: true, ..Default::default() };
+        assert!(czech.may_offer(&want(&["Super E10"])));
+        assert!(!czech.may_offer(&want(&["LPG"])));
         assert!(!hydrogen.may_offer(&want(&["Diesel"])));
         assert!(untagged.may_offer(&want(&["Diesel"])));
         assert!(diesel_only.may_offer(&[]));

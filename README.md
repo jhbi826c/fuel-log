@@ -6,8 +6,8 @@ UI languages: English, 中文, Deutsch.
 
 ## Features
 
-- **Fill-ups**: date and time, odometer (or trip distance), liters, price per liter, total (enter any two, the third is calculated), amount actually paid (discounts), full or partial tank, missed fill-ups, fuel type, station, address with GPS location, the consumption shown by the car's display, payment method and notes.
-- **Consumption**: calculated full-to-full. Partial fill-ups are added to the next full tank, and a missed fill-up starts a new measurement.
+- **Fill-ups**: date and time, odometer and/or distance since the last fill-up (either is enough), liters, price per liter, total (enter any two, the third is calculated), amount actually paid (discounts), full or partial tank, missed fill-ups, fuel type, station, address with GPS location, the consumption shown by the car's display, payment method and notes.
+- **Consumption**: calculated full-to-full from odometer readings or entered distances. Partial fill-ups are added to the next full tank, and a missed fill-up starts a new measurement; a full tank with an entered distance counts even as the first record.
 - **Statistics** (all time, 3 or 12 months, or per year):
   - Average consumption, average price, cost per km and per 100 km.
   - Total spent, liters and distance; monthly and yearly cost.
@@ -16,7 +16,7 @@ UI languages: English, 中文, Deutsch.
 - **Charts**: consumption trend, price trend and monthly spending, with touch-friendly tooltips.
 - **Tables**: per year, per station and per fuel type.
 - **Station picker**: "Nearby" in the fill-up form uses your location (and fills in the address via Nominatim); "Search here" uses the address or place typed into the address field. Both list the nearest fuel stations from OpenStreetMap (within 2 km, widening to 5 and 10 km when fewer than 3 are found), with the fuel types each station is tagged with; picking one fills in name, address and location.
-- **Fuel types**: picked from a fixed list (Super E10, Super E5, Super Plus, Super 100, Diesel, Premium Diesel, LPG, CNG, E85) or entered freely. Each vehicle can be limited to the fuels it uses; "Nearby" then hides stations tagged with other fuels only, and the form offers only those fuels. Types the chosen station is not tagged with are dimmed.
+- **Fuel types**: picked from a fixed list (Super E10, Super E5, Super Plus, Super 100, Diesel, Premium Diesel, LPG, CNG, E85) or entered freely. Each vehicle can be limited to the fuels it uses (compatible fuels count too, e.g. E5 for an E10 car); "Nearby" then hides stations tagged with other fuels only, the form offers only those fuels, and picking a station switches to a fuel it offers. Types the chosen station is not tagged with are dimmed.
 - **Map links**: Google Maps, Apple Maps, OpenStreetMap or OsmAnd.
 - **Several vehicles.**
 - **Data**:

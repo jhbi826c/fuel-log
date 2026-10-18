@@ -22,6 +22,9 @@ pub struct Record {
     pub date: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub odometer: Option<f64>,
+    /// Distance driven since the previous fill-up, as entered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trip: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub liters: Option<f64>,
     /// Pump price per liter.
@@ -72,6 +75,7 @@ impl Default for Record {
             vehicle_id: String::new(),
             date: String::new(),
             odometer: None,
+            trip: None,
             liters: None,
             price: None,
             total: None,
@@ -112,7 +116,7 @@ impl Record {
 
     /// Whether the record is usable (tombstones are always kept).
     pub fn is_valid(&self) -> bool {
-        self.deleted || (!self.id.is_empty() && self.date.len() >= 10 && self.odometer.is_some())
+        self.deleted || (!self.id.is_empty() && self.date.len() >= 10 && (self.odometer.is_some() || self.trip.is_some()))
     }
 }
 
@@ -314,6 +318,30 @@ pub fn is_known_fuel(name: &str) -> bool {
     FUEL_TYPES.iter().any(|(n, _)| *n == name)
 }
 
+/// Fuels a vehicle that runs on `fuel` can also take.
+fn compatible_fuels(fuel: &str) -> &'static [&'static str] {
+    match fuel {
+        "Super E10" => &["Super E10", "Super E5", "Super Plus", "Super 100"],
+        "Super E5" => &["Super E5", "Super Plus", "Super 100"],
+        "Super Plus" => &["Super Plus", "Super 100"],
+        "Super 100" => &["Super 100"],
+        "Diesel" | "Premium Diesel" => &["Diesel", "Premium Diesel"],
+        "LPG" => &["LPG"],
+        "CNG" => &["CNG"],
+        "E85" => &["E85"],
+        _ => &[],
+    }
+}
+
+/// Known fuels usable by a vehicle set to `fuels`, in list order.
+pub fn usable_fuels(fuels: &[String]) -> Vec<&'static str> {
+    FUEL_TYPES
+        .iter()
+        .map(|(name, _)| *name)
+        .filter(|name| fuels.iter().any(|f| compatible_fuels(f).contains(name)))
+        .collect()
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
@@ -389,6 +417,10 @@ mod tests {
     #[test]
     fn deserialize_defaults_full_to_true() {
         let r: Record = serde_json::from_str(r#"{"id":"a","date":"2026-01-01T10:00","odometer":5}"#).unwrap();
+        assert!(r.is_valid());
+        let t: Record = serde_json::from_str(r#"{"id":"t","date":"2026-01-01T10:00","trip":480}"#).unwrap();
+        assert!(t.is_valid() && t.trip == Some(480.0));
+        assert!(!Record { id: "x".into(), date: "2026-01-01T10:00".into(), ..Default::default() }.is_valid());
         assert!(r.full);
         assert!(!r.missed_previous);
     }
@@ -441,6 +473,15 @@ mod tests {
         assert_eq!(s.theme, Theme::Auto);
         let dark: Settings = serde_json::from_str(r#"{"theme":"dark"}"#).unwrap();
         assert_eq!(dark.theme, Theme::Dark);
+    }
+
+    #[test]
+    fn compatible_fuels_are_usable() {
+        let v = |f: &[&str]| f.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(usable_fuels(&v(&["Super E10"])), ["Super E10", "Super E5", "Super Plus", "Super 100"]);
+        assert_eq!(usable_fuels(&v(&["Diesel"])), ["Diesel", "Premium Diesel"]);
+        assert_eq!(usable_fuels(&v(&["LPG", "Super E5"])), ["Super E5", "Super Plus", "Super 100", "LPG"]);
+        assert!(usable_fuels(&v(&["AdBlue"])).is_empty());
     }
 
     #[test]
