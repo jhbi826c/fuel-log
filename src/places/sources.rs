@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use super::Station;
 use super::geo::distance_km;
-use crate::model::enc;
+use crate::model::{FUEL_TYPES, enc};
 
 pub type Origin = (f64, f64);
 
@@ -28,6 +28,19 @@ fn num(v: &Value) -> Option<f64> {
 
 fn first_text(v: &Value, keys: &[&str]) -> String {
     keys.iter().map(|k| text(v, k)).find(|s| !s.is_empty()).unwrap_or_default()
+}
+
+/// Fuel types a station is tagged with (`fuel:<key>=yes`), and whether it has any `fuel:*=yes` tag at all.
+fn tagged_fuels(tags: &Value) -> (Vec<&'static str>, bool) {
+    let any = tags
+        .as_object()
+        .is_some_and(|m| m.iter().any(|(k, v)| k.starts_with("fuel:") && v.as_str() == Some("yes")));
+    let known = FUEL_TYPES
+        .iter()
+        .filter(|(_, keys)| keys.iter().any(|k| text(tags, &format!("fuel:{k}")) == "yes"))
+        .map(|(name, _)| *name)
+        .collect();
+    (known, any)
 }
 
 /// "Street 1, 01234 City".
@@ -68,6 +81,7 @@ pub fn parse_overpass(v: &Value, origin: Origin) -> Result<Vec<Station>, String>
             let lng = num(&e["lon"]).or_else(|| num(&e["center"]["lon"]))?;
             let t = &e["tags"];
             let street = text(t, "addr:street");
+            let (fuels, fuel_tagged) = tagged_fuels(t);
             Some(Station {
                 id: format!("osm:{}/{}", text(e, "type"), text(e, "id")),
                 name: first_text(t, &["name", "brand", "operator"]),
@@ -82,6 +96,8 @@ pub fn parse_overpass(v: &Value, origin: Origin) -> Result<Vec<Station>, String>
                 lat,
                 lng,
                 dist_km: distance_km(origin, (lat, lng)),
+                fuels,
+                fuel_tagged,
             })
         })
         .collect())
@@ -112,6 +128,7 @@ pub fn parse_nominatim_search(v: &Value, origin: Origin) -> Result<Vec<Station>,
             let a = &s["address"];
             let street = text(a, "road");
             let brand = text(&s["extratags"], "brand");
+            let (fuels, fuel_tagged) = tagged_fuels(&s["extratags"]);
             Some(Station {
                 id: format!("osm:{}/{}", text(s, "osm_type"), text(s, "osm_id")),
                 name: if text(s, "name").is_empty() { brand.clone() } else { text(s, "name") },
@@ -121,6 +138,8 @@ pub fn parse_nominatim_search(v: &Value, origin: Origin) -> Result<Vec<Station>,
                 lat,
                 lng,
                 dist_km: distance_km(origin, (lat, lng)),
+                fuels,
+                fuel_tagged,
             })
         })
         .collect())
@@ -171,6 +190,7 @@ mod tests {
     fn overpass_and_nominatim() {
         let v = json!({"elements": [
             {"type": "node", "id": 1, "lat": 50.7717, "lon": 14.2066, "tags": {"amenity": "fuel", "name": "Shell",
+             "fuel:diesel": "yes", "fuel:octane_95": "yes", "fuel:lpg": "no", "fuel:GTL_diesel": "yes",
              "addr:street": "Předmostí", "addr:housenumber": "1960/4", "addr:postcode": "405 02", "addr:city": "Děčín"}},
             {"type": "way", "id": 2, "center": {"lat": 51.06, "lon": 13.75}, "tags": {"brand": "Aral", "addr:postcode": "01099"}}
         ]});
@@ -178,6 +198,9 @@ mod tests {
         assert_eq!(list[0].address, "Předmostí 1960/4, 405 02 Děčín");
         assert_eq!(list[1].name, "Aral");
         assert_eq!(list[1].id, "osm:way/2");
+        assert_eq!(list[0].fuels, ["Super E5", "Diesel", "Premium Diesel"]);
+        assert!(list[0].fuel_tagged);
+        assert!(list[1].fuels.is_empty() && !list[1].fuel_tagged);
 
         let n = json!([{"osm_type": "node", "osm_id": 5, "name": "", "lat": "50.7986", "lon": "14.2380",
             "extratags": {"brand": "AVIA"}, "address": {"road": "Loubská", "house_number": "83", "postcode": "405 02",

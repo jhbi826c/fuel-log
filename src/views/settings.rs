@@ -4,7 +4,7 @@ use wasm_bindgen::JsCast;
 
 use crate::app::{Ui, run_sync};
 use crate::i18n::{Lang, fill};
-use crate::model::{AppData, MapProvider, Theme};
+use crate::model::{AppData, FUEL_TYPES, MapProvider, Theme};
 use crate::store::Store;
 use crate::{format, web};
 
@@ -203,8 +203,25 @@ pub fn SettingsView() -> impl IntoView {
                         .zip(counts)
                         .map(|(v, n)| {
                             let (id, id2, name) = (v.id.clone(), v.id.clone(), v.name.clone());
+                            let fuel_chips = FUEL_TYPES
+                                .iter()
+                                .map(|(fuel, _)| {
+                                    let (vid, fuel) = (v.id.clone(), *fuel);
+                                    let on = v.fuels.iter().any(|f| f == fuel);
+                                    view! {
+                                        <button
+                                            type="button"
+                                            class=if on { "chip active" } else { "chip" }
+                                            on:click=move |_| store.toggle_vehicle_fuel(&vid, fuel)
+                                        >
+                                            {fuel}
+                                        </button>
+                                    }
+                                })
+                                .collect_view();
                             view! {
-                                <li>
+                                <li class="vehicle">
+                                <div class="vehicle-head">
                                     <span>
                                         {v.name.clone()}
                                         <small class="muted">" · "{fill(t.n_records, &[("n", &n)])}</small>
@@ -240,11 +257,14 @@ pub fn SettingsView() -> impl IntoView {
                                             }
                                         })}
                                     </span>
+                                </div>
+                                <div class="chips wrap">{fuel_chips}</div>
                                 </li>
                             }
                         })
                         .collect_view()}
                 </ul>
+                <p class="hint">{t.vehicle_fuels_hint}</p>
                 <button class="btn" on:click=add_vehicle>
                     {t.add_vehicle}
                 </button>

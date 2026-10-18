@@ -7,7 +7,7 @@ use super::{Icon, icon};
 use crate::app::Ui;
 use crate::format::{self, input_num, money, num, parse_num};
 use crate::i18n::fill;
-use crate::model::Record;
+use crate::model::{FUEL_TYPES, Record, is_known_fuel};
 use crate::places::geo::distance_km;
 use crate::places::{self, Station};
 use crate::stats::{SegState, analyze, parse_dt, sort_records};
@@ -74,7 +74,12 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         id: web::new_id(),
         vehicle_id: active.clone(),
         date: web::now_local(),
-        fuel: last_of_vehicle.as_ref().map(|r| r.fuel.clone()).unwrap_or_default(),
+        fuel: last_of_vehicle
+            .as_ref()
+            .map(|r| r.fuel.clone())
+            .filter(|f| !f.is_empty())
+            .or_else(|| store.vehicle_fuels(&active).into_iter().next())
+            .unwrap_or_default(),
         payment: last_of_vehicle.as_ref().map(|r| r.payment.clone()).unwrap_or_default(),
         ..Default::default()
     });
@@ -199,7 +204,22 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         }
         used
     };
-    let fuels = with_defaults(suggestions(|r| r.fuel.as_str()), store.t().fuel_suggestions);
+    let history_fuels: Vec<String> = suggestions(|r| r.fuel.as_str()).into_iter().filter(|f| !is_known_fuel(f)).take(4).collect();
+    let base_fuel = base.fuel.clone();
+    let fuel_options = Memo::new(move |_| {
+        let mine = store.data.with(|d| {
+            d.vehicles.iter().find(|v| v.id == vehicle.get()).map(|v| v.fuels.clone()).unwrap_or_default()
+        });
+        let mut opts: Vec<String> = FUEL_TYPES
+            .iter()
+            .map(|(name, _)| name.to_string())
+            .filter(|n| mine.is_empty() || mine.contains(n) || *n == base_fuel)
+            .collect();
+        opts.extend(history_fuels.iter().filter(|f| !opts.contains(f)).cloned().collect::<Vec<_>>());
+        opts
+    });
+    let custom_fuel = RwSignal::new(!base.fuel.is_empty() && !fuel_options.get_untracked().contains(&base.fuel));
+    let station_fuels = RwSignal::new(Vec::<&'static str>::new());
     let payments = with_defaults(suggestions(|r| r.payment.as_str()), store.t().payment_suggestions);
 
     let on_station_change = {
@@ -229,6 +249,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             address.set(st.address.clone());
         }
         coords.set(Some((st.lat, st.lng)));
+        station_fuels.set(st.fuels.clone());
         nearby.set(None);
     };
 
@@ -248,7 +269,8 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                     }
                 };
                 coords.set(Some(c));
-                let (addr, found) = futures::join!(places::reverse_geocode(c), places::nearby(c, NEARBY_LIMIT));
+                let wanted = store.vehicle_fuels(&vehicle.get_untracked());
+                let (addr, found) = futures::join!(places::reverse_geocode(c), places::nearby(c, NEARBY_LIMIT, &wanted));
                 if address.get_untracked().is_empty()
                     && let Ok(Some(a)) = addr
                 {
@@ -300,6 +322,11 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                                     <span class="pick-main">
                                         <b>{title}</b>
                                         <small class="muted">{st.address.clone()}</small>
+                                        {if st.fuels.is_empty() {
+                                            (!st.fuel_tagged).then(|| view! { <small class="muted">{t.fuels_unknown}</small> }.into_any())
+                                        } else {
+                                            Some(view! { <small class="fuels">{st.fuels.join(" · ")}</small> }.into_any())
+                                        }}
                                     </span>
                                     <span class="pick-side">
                                         <small class="muted">{dist}</small>
@@ -554,27 +581,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 </div>
                 <p class="hint">{t.full_hint}</p>
                 {preview_view}
-                <div class="grid2">
-                    <label class="field">
-                        <span>{t.fuel}</span>
-                        <input
-                            list="dl-fuel"
-                            autocomplete="off"
-                            prop:value=move || fuel.get()
-                            on:input=move |ev| fuel.set(event_target_value(&ev))
-                        />
-                    </label>
-                    <label class="field">
-                        <span>{t.display_cons}" (L/100 km)"</span>
-                        <input
-                            inputmode="decimal"
-                            autocomplete="off"
-                            placeholder=t.optional
-                            prop:value=move || display.get()
-                            on:input=move |ev| display.set(event_target_value(&ev))
-                        />
-                    </label>
-                </div>
                 <label class="field">
                     <span>{t.station}</span>
                     <div class="input-row">
@@ -582,7 +588,10 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                             list="dl-station"
                             autocomplete="off"
                             prop:value=move || station.get()
-                            on:input=move |ev| station.set(event_target_value(&ev))
+                            on:input=move |ev| {
+                                station.set(event_target_value(&ev));
+                                station_fuels.set(Vec::new());
+                            }
                             on:change=move |ev| on_station_change(event_target_value(&ev))
                         />
                         <button
@@ -620,6 +629,76 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                             }
                         })
                 }}
+                <div class="field">
+                    <span>{t.fuel}</span>
+                    <div class="chips wrap">
+                        {move || fuel_options.get()
+                            .iter()
+                            .map(|f| {
+                                let (f_class, f_click, label) = (f.clone(), f.clone(), f.clone());
+                                view! {
+                                    <button
+                                        type="button"
+                                        class=move || {
+                                            let known = station_fuels.with(|s| s.is_empty() || s.contains(&f_class.as_str()));
+                                            match (fuel.with(|v| *v == f_class) && !custom_fuel.get(), known) {
+                                                (true, _) => "chip active",
+                                                (false, false) => "chip dim",
+                                                (false, true) => "chip",
+                                            }
+                                        }
+                                        on:click=move |_| {
+                                            fuel.set(f_click.clone());
+                                            custom_fuel.set(false);
+                                        }
+                                    >
+                                        {label}
+                                    </button>
+                                }
+                            })
+                            .collect_view()}
+                        <button
+                            type="button"
+                            class=move || if custom_fuel.get() { "chip active" } else { "chip" }
+                            on:click=move |_| {
+                                custom_fuel.set(true);
+                                fuel.set(String::new());
+                            }
+                        >
+                            {t.other_fuel}
+                        </button>
+                    </div>
+                    {move || {
+                        custom_fuel
+                            .get()
+                            .then(|| {
+                                view! {
+                                    <input
+                                        autocomplete="off"
+                                        placeholder=store.t().other_fuel
+                                        prop:value=move || fuel.get()
+                                        on:input=move |ev| fuel.set(event_target_value(&ev))
+                                    />
+                                }
+                            })
+                    }}
+                    {move || {
+                        let f = fuel.get();
+                        let listed = station_fuels.with(|s| s.is_empty() || s.contains(&f.as_str()));
+                        (!listed && is_known_fuel(&f))
+                            .then(|| view! { <p class="hint warn">{fill(store.t().fuel_not_listed, &[("fuel", &f)])}</p> })
+                    }}
+                </div>
+                <label class="field">
+                    <span>{t.display_cons}" (L/100 km)"</span>
+                    <input
+                        inputmode="decimal"
+                        autocomplete="off"
+                        placeholder=t.optional
+                        prop:value=move || display.get()
+                        on:input=move |ev| display.set(event_target_value(&ev))
+                    />
+                </label>
                 <label class="field">
                     <span>{t.payment}</span>
                     <input
@@ -647,7 +726,6 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 })}
             </form>
             {datalist("dl-station", stations.clone())}
-            {datalist("dl-fuel", fuels.clone())}
             {datalist("dl-payment", payments.clone())}
         }
     })

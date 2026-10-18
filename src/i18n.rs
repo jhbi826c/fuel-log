@@ -158,6 +158,8 @@ pub struct Texts {
     pub missed_previous: &'static str,
     pub full_hint: &'static str,
     pub fuel: &'static str,
+    pub other_fuel: &'static str,
+    pub fuel_not_listed: &'static str,
     pub display_cons: &'static str,
     pub station: &'static str,
     pub address: &'static str,
@@ -194,6 +196,8 @@ pub struct Texts {
     pub vehicles: &'static str,
     pub rename: &'static str,
     pub add_vehicle: &'static str,
+    pub vehicle_fuels_hint: &'static str,
+    pub fuels_unknown: &'static str,
     pub vehicle_name_prompt: &'static str,
     pub confirm_delete_vehicle: &'static str,
     pub sync_title: &'static str,
@@ -230,7 +234,6 @@ pub struct Texts {
 
     pub weekdays: [&'static str; 7],
     pub months: [&'static str; 12],
-    pub fuel_suggestions: &'static [&'static str],
     pub payment_suggestions: &'static [&'static str],
 }
 
@@ -340,6 +343,8 @@ pub const EN: Texts = Texts {
     missed_previous: "Previous fill-up was not recorded",
     full_hint: "Consumption is calculated between two full tanks; partial fill-ups are added to the next full one.",
     fuel: "Fuel",
+    other_fuel: "Other…",
+    fuel_not_listed: "This station is not tagged with {fuel} on OpenStreetMap – please double-check.",
     display_cons: "Car display",
     station: "Station",
     address: "Address / location",
@@ -376,6 +381,8 @@ pub const EN: Texts = Texts {
     vehicles: "Vehicles",
     rename: "Rename",
     add_vehicle: "Add vehicle",
+    vehicle_fuels_hint: "Select the fuels each vehicle uses. \"Nearby\" then hides stations that are tagged with other fuels only; stations without fuel information stay in the list.",
+    fuels_unknown: "fuels unknown",
     vehicle_name_prompt: "Vehicle name",
     confirm_delete_vehicle: "Delete this vehicle and its {n} fill-ups?",
     sync_title: "Sync (GitHub Gist)",
@@ -412,7 +419,6 @@ pub const EN: Texts = Texts {
 
     weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-    fuel_suggestions: &["Super E10", "Super E5", "Super Plus", "Diesel", "LPG"],
     payment_suggestions: &["Card", "Cash", "Apple Pay", "Fuel card"],
 };
 
@@ -522,6 +528,8 @@ pub const ZH: Texts = Texts {
     missed_previous: "上一次加油漏记了",
     full_hint: "油耗按两次加满之间计算；未加满时的油量会计入下一次加满。",
     fuel: "油品",
+    other_fuel: "其他…",
+    fuel_not_listed: "OpenStreetMap 上这个加油站没有标注提供 {fuel}，请确认一下。",
     display_cons: "车机油耗",
     station: "加油站",
     address: "地址 / 位置",
@@ -558,6 +566,8 @@ pub const ZH: Texts = Texts {
     vehicles: "车辆",
     rename: "重命名",
     add_vehicle: "添加车辆",
+    vehicle_fuels_hint: "选择每辆车使用的油品。「附近」会剔除只标注了其他油品的加油站；没有标注油品的加油站会保留。",
+    fuels_unknown: "油品未知",
     vehicle_name_prompt: "车辆名称",
     confirm_delete_vehicle: "删除这辆车及其 {n} 条记录？",
     sync_title: "云同步（GitHub Gist）",
@@ -594,7 +604,6 @@ pub const ZH: Texts = Texts {
 
     weekdays: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
     months: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
-    fuel_suggestions: &["92#", "95#", "98#", "0# 柴油", "Super E10", "Super E5", "Diesel"],
     payment_suggestions: &["微信", "支付宝", "银行卡", "现金", "加油卡"],
 };
 
@@ -704,6 +713,8 @@ pub const DE: Texts = Texts {
     missed_previous: "Vorherigen Tankvorgang nicht erfasst",
     full_hint: "Der Verbrauch wird zwischen zwei Vollbetankungen berechnet; Teilbetankungen werden zur nächsten Vollbetankung addiert.",
     fuel: "Kraftstoff",
+    other_fuel: "Andere…",
+    fuel_not_listed: "Diese Tankstelle ist in OpenStreetMap nicht mit {fuel} markiert – bitte prüfen.",
     display_cons: "Bordcomputer",
     station: "Tankstelle",
     address: "Adresse / Ort",
@@ -740,6 +751,8 @@ pub const DE: Texts = Texts {
     vehicles: "Fahrzeuge",
     rename: "Umbenennen",
     add_vehicle: "Fahrzeug hinzufügen",
+    vehicle_fuels_hint: "Wähle die Kraftstoffe jedes Fahrzeugs. „In der Nähe“ blendet dann Tankstellen aus, die nur mit anderen Kraftstoffen markiert sind; Tankstellen ohne Kraftstoffangaben bleiben in der Liste.",
+    fuels_unknown: "Kraftstoffe unbekannt",
     vehicle_name_prompt: "Name des Fahrzeugs",
     confirm_delete_vehicle: "Dieses Fahrzeug und seine {n} Tankvorgänge löschen?",
     sync_title: "Synchronisation (GitHub Gist)",
@@ -776,7 +789,6 @@ pub const DE: Texts = Texts {
 
     weekdays: ["So.", "Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa."],
     months: ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez."],
-    fuel_suggestions: &["Super E10", "Super E5", "Super Plus", "Diesel", "LPG"],
     payment_suggestions: &["EC-Karte", "Kreditkarte", "Bar", "Apple Pay", "Tankkarte"],
 };
 
@@ -799,7 +811,8 @@ mod tests {
 
     #[test]
     fn placeholders_match_across_languages() {
-        let pick: [fn(&Texts) -> &'static str; 13] = [
+        let pick: [fn(&Texts) -> &'static str; 14] = [
+            |t| t.fuel_not_listed,
             |t| t.no_nearby,
             |t| t.pick_station,
             |t| t.sync_done_pulled,

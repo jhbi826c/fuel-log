@@ -126,6 +126,9 @@ pub struct Vehicle {
     pub updated_at: f64,
     #[serde(default, skip_serializing_if = "is_false")]
     pub deleted: bool,
+    /// Fuel types this vehicle uses; empty means any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fuels: Vec<String>,
 }
 
 /// Data that is exported and synced.
@@ -294,6 +297,23 @@ pub fn enc(s: &str) -> String {
     out
 }
 
+/// Common fuel types and their OpenStreetMap `fuel:*` keys.
+pub const FUEL_TYPES: [(&str, &[&str]); 9] = [
+    ("Super E10", &["e10"]),
+    ("Super E5", &["octane_95"]),
+    ("Super Plus", &["octane_98"]),
+    ("Super 100", &["octane_100"]),
+    ("Diesel", &["diesel"]),
+    ("Premium Diesel", &["GTL_diesel", "diesel:premium"]),
+    ("LPG", &["lpg"]),
+    ("CNG", &["cng"]),
+    ("E85", &["e85"]),
+];
+
+pub fn is_known_fuel(name: &str) -> bool {
+    FUEL_TYPES.iter().any(|(n, _)| *n == name)
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
@@ -396,7 +416,7 @@ mod tests {
         deleted.deleted = true;
         let remote = AppData {
             version: 1,
-            vehicles: vec![Vehicle { id: "v".into(), name: "Car".into(), updated_at: 1.0, deleted: false }],
+            vehicles: vec![Vehicle { id: "v".into(), name: "Car".into(), updated_at: 1.0, deleted: false, fuels: Vec::new() }],
             records: vec![r("a", 2.0, "new"), deleted, r("c", 1.0, "added"), Record::default()],
         };
         assert_eq!(local.merge(&remote), 3);

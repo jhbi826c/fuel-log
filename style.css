@@ -1241,3 +1241,48 @@ td.name {
   }
 }
 
+
+.chips.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+}
+
+.chip.dim {
+  opacity: 0.45;
+}
+
+.hint.warn {
+  margin: 2px 0 0;
+  color: var(--warn);
+}
+
+.pick-main .fuels {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.list li.vehicle {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.vehicle-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.vehicle .chip {
+  min-height: 30px;
+  padding: 3px 11px;
+  font-size: 0.82rem;
+}
+
+.card > .hint + .btn {
+  margin-top: 10px;
+}

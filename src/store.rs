@@ -123,7 +123,7 @@ impl Store {
 
     pub fn add_vehicle(&self, name: &str) -> String {
         let id = web::new_id();
-        let v = Vehicle { id: id.clone(), name: name.to_string(), updated_at: web::now_ms(), deleted: false };
+        let v = Vehicle { id: id.clone(), name: name.to_string(), updated_at: web::now_ms(), deleted: false, fuels: Vec::new() };
         self.data.update(|d| d.vehicles.push(v));
         self.commit();
         id
@@ -138,6 +138,30 @@ impl Store {
             }
         });
         self.commit();
+    }
+
+    /// Adds or removes a fuel type from a vehicle's list.
+    pub fn toggle_vehicle_fuel(&self, id: &str, fuel: &str) {
+        let now = web::now_ms();
+        self.data.update(|d| {
+            if let Some(v) = d.vehicles.iter_mut().find(|v| v.id == id) {
+                match v.fuels.iter().position(|f| f == fuel) {
+                    Some(i) => {
+                        v.fuels.remove(i);
+                    }
+                    None => v.fuels.push(fuel.to_string()),
+                }
+                v.updated_at = now;
+            }
+        });
+        self.commit();
+    }
+
+    /// Fuel types a vehicle uses (empty means any).
+    pub fn vehicle_fuels(&self, id: &str) -> Vec<String> {
+        self.data
+            .with_untracked(|d| d.vehicles.iter().find(|v| v.id == id).map(|v| v.fuels.clone()))
+            .unwrap_or_default()
     }
 
     /// Deletes a vehicle together with its records.
@@ -231,6 +255,7 @@ fn ensure_vehicle(d: &mut AppData, lang: Lang) {
             name: lang.t().default_vehicle.into(),
             updated_at: 0.0,
             deleted: false,
+            fuels: Vec::new(),
         }),
     }
 }
