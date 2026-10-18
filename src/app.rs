@@ -5,7 +5,7 @@ use leptos::ev;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 
-use crate::i18n::fill;
+use crate::i18n::{Lang, fill};
 use crate::model::Theme;
 use crate::stats::{Range, parse_dt};
 use crate::store::Store;
@@ -214,6 +214,7 @@ pub fn App() -> impl IntoView {
             </a>
             <div class="topbar-right">
                 <VehicleSelect />
+                <LangSelect />
                 {move || {
                     store
                         .sync
@@ -293,6 +294,29 @@ fn Tab(
         </a>
     }
 }
+#[component]
+fn LangSelect() -> impl IntoView {
+    let store = expect_context::<Store>();
+    move || {
+        let current = store.lang();
+        view! {
+            <select
+                class="lang-select"
+                aria-label=store.t().language
+                on:change=move |ev| {
+                    let lang = Lang::from_code(&event_target_value(&ev));
+                    store.update_settings(|s| s.lang = lang);
+                }
+            >
+                {Lang::ALL
+                    .into_iter()
+                    .map(|l| view! { <option value=l.code() selected=l == current>{l.short_name()}</option> })
+                    .collect_view()}
+            </select>
+        }
+    }
+}
+
 
 #[component]
 fn VehicleSelect() -> impl IntoView {

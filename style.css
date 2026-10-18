@@ -166,6 +166,16 @@ h3 {
   min-width: 0;
 }
 
+.lang-select {
+  width: auto;
+  height: 38px;
+  min-height: 38px;
+  padding: 4px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--card);
+}
+
 .vehicle-select {
   max-width: 45vw;
 }

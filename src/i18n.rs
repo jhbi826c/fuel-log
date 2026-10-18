@@ -34,6 +34,15 @@ impl Lang {
         }
     }
 
+    /// Compact label for the top bar.
+    pub fn short_name(self) -> &'static str {
+        match self {
+            Lang::En => "EN",
+            Lang::Zh => "中文",
+            Lang::De => "DE",
+        }
+    }
+
     pub fn t(self) -> &'static Texts {
         match self {
             Lang::En => &EN,
