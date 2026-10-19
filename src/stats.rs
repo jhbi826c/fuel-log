@@ -170,7 +170,7 @@ pub struct YearAgg {
     pub count: usize,
     pub dist: f64,
     pub cons: Option<f64>,
-    pub cost_per_km: Option<f64>,
+    pub cost_per_100km: Option<f64>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -197,7 +197,7 @@ pub struct Stats {
     pub avg_cost_per_fill: Option<f64>,
     pub avg_liters_per_fill: Option<f64>,
     pub avg_cons: Option<f64>,
-    pub cost_per_km: Option<f64>,
+    pub cost_per_100km: Option<f64>,
     pub seg_count: usize,
     pub seg_dist: f64,
     pub best_cons: Option<f64>,
@@ -275,7 +275,7 @@ pub fn compute(all: &[Entry], range: &Range) -> Stats {
     s.seg_count = segs.len();
     s.seg_dist = segs.iter().map(|(_, g)| g.dist).sum();
     s.avg_cons = ratio(seg_liters * 100.0, s.seg_dist);
-    s.cost_per_km = ratio(seg_cost, s.seg_dist);
+    s.cost_per_100km = ratio(seg_cost * 100.0, s.seg_dist);
     s.best_cons = segs.iter().map(|(_, g)| g.cons).min_by(f64::total_cmp);
     s.worst_cons = segs.iter().map(|(_, g)| g.cons).max_by(f64::total_cmp);
     s.last_cons = segs.last().map(|(_, g)| g.cons);
@@ -356,7 +356,7 @@ fn yearly(recs: &[&Entry]) -> Vec<YearAgg> {
         .rev()
         .map(|(mut y, l, d, c)| {
             y.cons = ratio(l * 100.0, d);
-            y.cost_per_km = ratio(c, d);
+            y.cost_per_100km = ratio(c * 100.0, d);
             y
         })
         .collect()
@@ -549,7 +549,7 @@ mod tests {
         assert!(close(s.savings, 4.0));
         assert!(close(s.distance, 1000.0));
         assert!(close(s.avg_cons.unwrap(), 6.5));
-        assert!(close(s.cost_per_km.unwrap(), 113.0 / 1000.0));
+        assert!(close(s.cost_per_100km.unwrap(), 11.3));
         assert!(close(s.best_cons.unwrap(), 6.0));
         assert!(close(s.worst_cons.unwrap(), 7.0));
         assert!(close(s.last_cons.unwrap(), 7.0));

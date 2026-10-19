@@ -452,6 +452,11 @@ textarea {
   resize: vertical;
 }
 
+input[type="search"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -1207,6 +1212,18 @@ td.name {
 
 .pick:hover {
   border-color: var(--accent);
+}
+
+.pick.active {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.currency-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 0;
+  overscroll-behavior: contain;
 }
 
 .pick-main,

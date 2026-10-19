@@ -6,10 +6,25 @@ use crate::app::{Ui, run_sync};
 use crate::i18n::{Lang, fill};
 use crate::model::{AppData, FUEL_TYPES, MapProvider, Theme};
 use crate::store::Store;
-use crate::{format, web};
+use crate::{currency, format, web};
 
 const TOKEN_URL: &str = "https://github.com/settings/tokens/new?scopes=gist&description=Fuel%20Log";
-const CURRENCIES: [&str; 9] = ["€", "Kč", "zł", "CHF", "£", "$", "¥", "Ft", "kr"];
+const MAX_SYMBOL_LEN: usize = 5;
+
+/// Whether a search query can be used as-is as a custom currency symbol.
+fn custom_ok(q: &str) -> bool {
+    let n = q.trim().chars().count();
+    n > 0 && n <= MAX_SYMBOL_LEN
+}
+
+/// The symbol, plus the currency name when the symbol is unambiguous.
+fn currency_label(symbol: &str, lang: Lang) -> String {
+    let mut found = currency::CURRENCIES.iter().filter(|c| c.symbol == symbol);
+    match (found.next(), found.next()) {
+        (Some(c), None) => format!("{symbol} · {}", c.name(lang)),
+        _ => symbol.to_string(),
+    }
+}
 
 fn picked_file(ev: &leptos::ev::Event) -> Option<web_sys::File> {
     let input = ev.target()?.dyn_into::<web_sys::HtmlInputElement>().ok()?;
@@ -27,6 +42,8 @@ pub fn SettingsView() -> impl IntoView {
     let store = expect_context::<Store>();
     let ui = expect_context::<Ui>();
     let token_input = RwSignal::new(String::new());
+    let cur_open = RwSignal::new(false);
+    let cur_query = RwSignal::new(String::new());
 
     let export_json = move |_| {
         let mut data = store.snapshot();
@@ -103,10 +120,71 @@ pub fn SettingsView() -> impl IntoView {
         }
     };
 
+    let close_currency = move || {
+        cur_open.set(false);
+        cur_query.set(String::new());
+        if let Some(el) = document().active_element().and_then(|e| e.dyn_into::<web_sys::HtmlElement>().ok()) {
+            let _ = el.blur();
+        }
+    };
+
+    let pick_currency = move |symbol: String| {
+        let symbol = symbol.trim().to_string();
+        store.update_settings(|s| s.currency = symbol);
+        close_currency();
+    };
+
+    let currency_list = move || {
+        if !cur_open.get() {
+            return None;
+        }
+        let t = store.t();
+        let l = store.lang();
+        let current = store.currency();
+        let q = cur_query.get();
+        let hits = currency::search(&q);
+        let custom = (custom_ok(&q) && !hits.iter().any(|c| c.symbol == q.trim())).then(|| {
+            let v = q.trim().to_string();
+            view! {
+                <button type="button" class="pick" on:click=move |_| pick_currency(v.clone())>
+                    <span class="pick-main">{fill(t.use_custom_currency, &[("v", &q.trim())])}</span>
+                </button>
+            }
+        });
+        Some(view! {
+            // Keep focus in the search box so a tap on an option isn't swallowed by blur.
+            <div class="picker currency-list" on:mousedown=|ev| ev.prevent_default()>
+                {hits
+                    .into_iter()
+                    .map(|c| {
+                        view! {
+                            <button
+                                type="button"
+                                class="pick"
+                                class:active=c.symbol == current
+                                on:click=move |_| pick_currency(c.symbol.to_string())
+                            >
+                                <span class="pick-main">
+                                    <b>{c.name(l)}</b>
+                                    <small class="muted">{c.code}</small>
+                                </span>
+                                <span class="pick-side">
+                                    <b>{c.symbol}</b>
+                                </span>
+                            </button>
+                        }
+                    })
+                    .collect_view()}
+                {custom}
+            </div>
+        })
+    };
+
     let general = move || {
         let t = store.t();
         let l = store.lang();
         let settings = store.settings.get();
+        let current_label = currency_label(&settings.currency, l);
         view! {
             <section class="card">
                 <h2>{t.settings_general}</h2>
@@ -122,24 +200,39 @@ pub fn SettingsView() -> impl IntoView {
                             .collect_view()}
                     </select>
                 </label>
-                <label class="field">
+                <div class="field">
                     <span>{t.currency}</span>
                     <input
-                        list="dl-currency"
-                        maxlength="5"
+                        type="search"
                         autocomplete="off"
-                        prop:value=settings.currency.clone()
-                        on:change=move |ev| {
-                            let v = event_target_value(&ev).trim().to_string();
-                            if !v.is_empty() {
-                                store.update_settings(|s| s.currency = v);
+                        spellcheck="false"
+                        placeholder=t.search_currency
+                        prop:value=move || if cur_open.get() { cur_query.get() } else { current_label.clone() }
+                        on:focus=move |_| {
+                            cur_query.set(String::new());
+                            cur_open.set(true);
+                        }
+                        on:blur=move |_| cur_open.set(false)
+                        on:input=move |ev| {
+                            cur_query.set(event_target_value(&ev));
+                            cur_open.set(true);
+                        }
+                        on:keydown=move |ev| match ev.key().as_str() {
+                            "Enter" => {
+                                ev.prevent_default();
+                                let q = cur_query.get_untracked();
+                                match currency::search(&q).first() {
+                                    Some(c) => pick_currency(c.symbol.to_string()),
+                                    None if custom_ok(&q) => pick_currency(q),
+                                    None => {}
+                                }
                             }
+                            "Escape" => close_currency(),
+                            _ => {}
                         }
                     />
-                    <datalist id="dl-currency">
-                        {CURRENCIES.map(|c| view! { <option value=c></option> }).collect_view()}
-                    </datalist>
-                </label>
+                    {currency_list}
+                </div>
                 <label class="field">
                     <span>{t.map_provider}</span>
                     <select on:change=move |ev| {

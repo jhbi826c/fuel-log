@@ -1,5 +1,6 @@
 mod app;
 mod charts;
+mod currency;
 mod format;
 mod i18n;
 mod model;

@@ -215,7 +215,7 @@ fn StatsView(stats: Stats) -> impl IntoView {
                                 <th class="r">{t.col_spent}</th>
                                 <th class="r">"km"</th>
                                 <th class="r">"L/100 km"</th>
-                                <th class="r">{t.col_per_km}</th>
+                                <th class="r">{t.col_per_100km}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -230,7 +230,7 @@ fn StatsView(stats: Stats) -> impl IntoView {
                                             <td class="r">{money(l, &cur, y.cost, 0)}</td>
                                             <td class="r">{num(l, y.dist, 0)}</td>
                                             <td class="r">{opt(l, y.cons, 2)}</td>
-                                            <td class="r">{m(y.cost_per_km, 3)}</td>
+                                            <td class="r">{m(y.cost_per_100km, 2)}</td>
                                         </tr>
                                     }
                                 })
@@ -297,9 +297,8 @@ fn StatsView(stats: Stats) -> impl IntoView {
                     <div class="mid">{m(s.avg_price, 3)} <small>" /L"</small></div>
                 </div>
                 <div>
-                    <div class="label">{t.cost_per_km}</div>
-                    <div class="mid">{m(s.cost_per_km, 3)} <small>" /km"</small></div>
-                    {s.cost_per_km.map(|c| view! { <div class="sub">{fill(t.per_100km, &[("v", &money(l, &cur, c * 100.0, 2))])}</div> })}
+                    <div class="label">{t.cost_per_100km}</div>
+                    <div class="mid">{m(s.cost_per_100km, 2)} <small>" /100 km"</small></div>
                 </div>
             </div>
         </section>
