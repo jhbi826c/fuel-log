@@ -4,6 +4,7 @@ use serde::de::DeserializeOwned;
 pub const DATA_KEY: &str = "fuellog.data";
 pub const SETTINGS_KEY: &str = "fuellog.settings";
 pub const SYNC_KEY: &str = "fuellog.sync";
+pub const TK_KEY: &str = "fuellog.tankerkoenig";
 
 fn storage() -> Option<web_sys::Storage> {
     web_sys::window()?.local_storage().ok()?

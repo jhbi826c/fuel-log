@@ -1,10 +1,12 @@
 mod form;
 mod overview;
+mod prices;
 mod records;
 mod settings;
 
 pub use form::RecordForm;
 pub use overview::Overview;
+pub use prices::{PriceState, PricesView};
 pub use records::Records;
 pub use settings::SettingsView;
 
@@ -23,6 +25,7 @@ pub enum Icon {
     Locate,
     Search,
     Calendar,
+    Fuel,
 }
 
 impl Icon {
@@ -39,6 +42,9 @@ impl Icon {
             Self::Locate => r#"<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>"#,
             Self::Search => r#"<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>"#,
             Self::Calendar => r#"<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>"#,
+            Self::Fuel => {
+                r#"<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M2 21h14M7 8h4"/><path d="M14 10h2a2 2 0 0 1 2 2v4.5a1.5 1.5 0 0 0 3 0V9l-3-3"/>"#
+            }
         }
     }
 }

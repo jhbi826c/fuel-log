@@ -275,6 +275,16 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         nearby.set(None);
     };
 
+    if !editing && let Some(p) = ui.prefill.get_untracked() {
+        ui.prefill.set(None);
+        apply_station(&p.station);
+        fuel.set(p.fuel.to_string());
+        custom_fuel.set(!fuel_options.get_untracked().iter().any(|f| f == p.fuel));
+        if let Some(v) = p.price.filter(|_| store.settings.with_untracked(|s| s.currency == "€")) {
+            on_trio(Trio::Price, input_num(l, v, 3));
+        }
+    }
+
     let locate = {
         let all = all.clone();
         move |_| {

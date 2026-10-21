@@ -3,7 +3,7 @@ use leptos::prelude::*;
 use crate::i18n::{Lang, Texts};
 use crate::model::{AppData, Record, Settings, SyncConf, Vehicle};
 use crate::stats::{Entry, analyze};
-use crate::storage::{self, DATA_KEY, SETTINGS_KEY, SYNC_KEY};
+use crate::storage::{self, DATA_KEY, SETTINGS_KEY, SYNC_KEY, TK_KEY};
 use crate::web;
 
 /// Application state shared through context.
@@ -13,6 +13,8 @@ pub struct Store {
     pub settings: RwSignal<Settings>,
     pub sync: RwSignal<SyncConf>,
     pub sync_busy: RwSignal<bool>,
+    /// Tankerkönig API key; kept on this device only, outside settings, export and sync.
+    pub tk_key: RwSignal<String>,
     /// Bumped on every local edit.
     pub local_change: RwSignal<u64>,
     pub save_error: RwSignal<Option<String>>,
@@ -32,6 +34,7 @@ impl Store {
             settings: RwSignal::new(settings),
             sync: RwSignal::new(storage::load(SYNC_KEY).unwrap_or_default()),
             sync_busy: RwSignal::new(false),
+            tk_key: RwSignal::new(storage::load(TK_KEY).unwrap_or_default()),
             local_change: RwSignal::new(0),
             save_error: RwSignal::new(None),
         }
@@ -227,6 +230,17 @@ impl Store {
     pub fn clear_sync(&self) {
         self.sync.set(SyncConf::default());
         storage::remove(SYNC_KEY);
+    }
+
+    pub fn set_tk_key(&self, key: &str) -> Result<(), String> {
+        storage::save(TK_KEY, &key)?;
+        self.tk_key.set(key.to_string());
+        Ok(())
+    }
+
+    pub fn clear_tk_key(&self) {
+        storage::remove(TK_KEY);
+        self.tk_key.set(String::new());
     }
 
     fn persist(&self) {

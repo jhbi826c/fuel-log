@@ -5,6 +5,7 @@ use wasm_bindgen::JsCast;
 use crate::app::{Ui, run_sync};
 use crate::i18n::{Lang, fill};
 use crate::model::{AppData, FUEL_TYPES, MapProvider, Theme};
+use crate::places::tankerkoenig::{self as tk, TkError};
 use crate::store::Store;
 use crate::{currency, format, web};
 
@@ -42,6 +43,8 @@ pub fn SettingsView() -> impl IntoView {
     let store = expect_context::<Store>();
     let ui = expect_context::<Ui>();
     let token_input = RwSignal::new(String::new());
+    let tk_input = RwSignal::new(String::new());
+    let tk_checking = RwSignal::new(false);
     let cur_open = RwSignal::new(false);
     let cur_query = RwSignal::new(String::new());
 
@@ -365,6 +368,95 @@ pub fn SettingsView() -> impl IntoView {
         }
     };
 
+    let save_tk_key = move || {
+        let key = tk_input.get_untracked().trim().to_string();
+        if !tk::is_valid_key(&key) {
+            ui.error(store.t().tk_key_bad_format);
+            return;
+        }
+        tk_checking.set(true);
+        spawn_local(async move {
+            let t = store.t();
+            match tk::check_key(&key).await {
+                Err(TkError::InvalidKey) => ui.error(t.tk_key_rejected),
+                checked => match store.set_tk_key(&key) {
+                    Ok(()) => {
+                        tk_input.set(String::new());
+                        ui.toast(if checked.is_ok() { t.tk_key_ok } else { t.tk_key_unchecked });
+                    }
+                    Err(e) => ui.error(format!("{} ({e})", t.save_failed)),
+                },
+            }
+            tk_checking.set(false);
+        });
+    };
+
+    let prices = move || {
+        let t = store.t();
+        let key = store.tk_key.get();
+        let body = if key.is_empty() {
+            view! {
+                <p class="muted">
+                    {t.tk_intro}" "
+                    <a href=tk::SIGNUP_URL target="_blank" rel="noopener noreferrer">
+                        {t.tk_get_key}" ↗"
+                    </a>
+                </p>
+                <label class="field">
+                    <span>"API key"</span>
+                    <input
+                        type="password"
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        prop:value=move || tk_input.get()
+                        on:input=move |ev| tk_input.set(event_target_value(&ev))
+                        on:keydown=move |ev| {
+                            if ev.key() == "Enter" {
+                                ev.prevent_default();
+                                save_tk_key();
+                            }
+                        }
+                    />
+                </label>
+                <button class="btn primary" disabled=move || tk_checking.get() on:click=move |_| save_tk_key()>
+                    {move || if tk_checking.get() { store.t().tk_checking } else { store.t().save }}
+                </button>
+            }
+            .into_any()
+        } else {
+            view! {
+                <p class="muted">{t.tk_intro}</p>
+                <p>
+                    <span class="badge good">{fill(t.tk_key_saved, &[("key", &tk::key_hint(&key))])}</span>
+                </p>
+                <div class="btn-row">
+                    <a class="btn" href="#/prices">
+                        {t.nav_prices}
+                    </a>
+                    <button
+                        class="btn danger"
+                        on:click=move |_| {
+                            if web::confirm(store.t().tk_confirm_remove) {
+                                store.clear_tk_key();
+                            }
+                        }
+                    >
+                        {t.remove}
+                    </button>
+                </div>
+            }
+            .into_any()
+        };
+        view! {
+            <section class="card">
+                <h2>{t.tk_title}</h2>
+                {body}
+                <p class="hint">{t.tk_key_privacy}</p>
+            </section>
+        }
+    };
+
     let sync = move || {
         let t = store.t();
         let l = store.lang();
@@ -491,6 +583,7 @@ pub fn SettingsView() -> impl IntoView {
     view! {
         {general}
         {vehicles}
+        {prices}
         {sync}
         {data}
     }

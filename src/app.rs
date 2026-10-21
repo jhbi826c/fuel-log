@@ -7,10 +7,11 @@ use leptos::task::spawn_local;
 
 use crate::i18n::{Lang, fill};
 use crate::model::Theme;
+use crate::places::Station;
 use crate::stats::{Range, parse_dt};
 use crate::store::Store;
 use crate::sync::{SyncError, sync_once};
-use crate::views::{Icon, Overview, RecordForm, Records, SettingsView, icon};
+use crate::views::{Icon, Overview, PriceState, PricesView, RecordForm, Records, SettingsView, icon};
 use crate::web;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -19,6 +20,7 @@ pub enum Route {
     Records,
     Add,
     Edit(String),
+    Prices,
     Settings,
 }
 
@@ -30,6 +32,7 @@ impl Route {
             _ => match h {
                 "records" => Self::Records,
                 "add" => Self::Add,
+                "prices" => Self::Prices,
                 "settings" => Self::Settings,
                 _ => Self::Overview,
             },
@@ -71,6 +74,15 @@ impl Period {
     }
 }
 
+/// Station picked on the price page for a new record.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Prefill {
+    pub station: Station,
+    pub fuel: &'static str,
+    /// Euro price per litre.
+    pub price: Option<f64>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Toast {
     pub id: u64,
@@ -87,6 +99,8 @@ pub struct Ui {
     toast_seq: RwSignal<u64>,
     pub period: RwSignal<Period>,
     pub search: RwSignal<String>,
+    pub prices: PriceState,
+    pub prefill: RwSignal<Option<Prefill>>,
     sync_pending: RwSignal<bool>,
 }
 
@@ -173,6 +187,8 @@ pub fn App() -> impl IntoView {
         toast_seq: RwSignal::new(0),
         period: RwSignal::new(Period::All),
         search: RwSignal::new(String::new()),
+        prices: PriceState::default(),
+        prefill: RwSignal::new(None),
         sync_pending: RwSignal::new(false),
     };
     provide_context(ui);
@@ -257,6 +273,7 @@ pub fn App() -> impl IntoView {
                 Route::Records => view! { <Records /> }.into_any(),
                 Route::Add => view! { <RecordForm /> }.into_any(),
                 Route::Edit(id) => view! { <RecordForm id=id /> }.into_any(),
+                Route::Prices => view! { <PricesView /> }.into_any(),
                 Route::Settings => view! { <SettingsView /> }.into_any(),
             }}
         </main>
@@ -268,6 +285,7 @@ pub fn App() -> impl IntoView {
                 label=|t| t.nav_records
                 active=|r| matches!(r, Route::Records | Route::Add | Route::Edit(_))
             />
+            <Tab href="#/prices" icon=Icon::Fuel label=|t| t.nav_prices active=|r| *r == Route::Prices />
             <Tab href="#/settings" icon=Icon::Settings label=|t| t.nav_settings active=|r| *r == Route::Settings />
         </nav>
         {move || {
@@ -397,6 +415,7 @@ mod tests {
     fn routes() {
         assert_eq!(Route::parse(""), Route::Overview);
         assert_eq!(Route::parse("#/records"), Route::Records);
+        assert_eq!(Route::parse("#/prices"), Route::Prices);
         assert_eq!(Route::parse("#/edit/abc"), Route::Edit("abc".into()));
         assert_eq!(Route::parse("#/edit/"), Route::Overview);
     }

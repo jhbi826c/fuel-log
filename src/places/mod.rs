@@ -1,7 +1,8 @@
 pub mod geo;
 mod sources;
+pub mod tankerkoenig;
 
-pub use sources::{geocode, reverse_geocode};
+pub use sources::{country_at, find_place, geocode, reverse_geocode};
 
 use crate::model::usable_fuels;
 

@@ -14,7 +14,7 @@ const TIMEOUT_MS: i32 = 12_000;
 /// How long to keep waiting for Overpass once Nominatim has answered.
 const OVERPASS_GRACE_MS: i32 = 3_000;
 
-fn text(v: &Value, k: &str) -> String {
+pub(super) fn text(v: &Value, k: &str) -> String {
     match &v[k] {
         Value::String(s) => s.trim().to_string(),
         Value::Number(n) => n.to_string(),
@@ -22,7 +22,7 @@ fn text(v: &Value, k: &str) -> String {
     }
 }
 
-fn num(v: &Value) -> Option<f64> {
+pub(super) fn num(v: &Value) -> Option<f64> {
     v.as_f64().or_else(|| v.as_str()?.trim().parse().ok())
 }
 
@@ -199,6 +199,33 @@ pub async fn geocode(q: &str) -> Result<Option<(f64, f64)>, String> {
     Ok(parse_geocode(&v))
 }
 
+/// A searched place: position, short name and lowercase country code.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Place {
+    pub lat: f64,
+    pub lng: f64,
+    pub name: String,
+    pub country: String,
+}
+
+pub fn parse_place(v: &Value) -> Option<Place> {
+    let p = v.as_array()?.first()?;
+    let name = text(p, "display_name").split(',').take(2).map(str::trim).collect::<Vec<_>>().join(", ");
+    Some(Place { lat: num(&p["lat"])?, lng: num(&p["lon"])?, name, country: text(&p["address"], "country_code") })
+}
+
+/// Best match for an address or place name, with its country.
+pub async fn find_place(q: &str) -> Result<Option<Place>, String> {
+    let v = get_json(&format!("{NOMINATIM}/search?q={}&format=jsonv2&limit=1&addressdetails=1", enc(q.trim()))).await?;
+    Ok(parse_place(&v))
+}
+
+/// Lowercase country code at a position; `None` outside any country.
+pub async fn country_at((lat, lng): Origin) -> Result<Option<String>, String> {
+    let v = get_json(&format!("{NOMINATIM}/reverse?format=jsonv2&lat={lat:.5}&lon={lng:.5}&zoom=3&addressdetails=1")).await?;
+    Ok(Some(text(&v["address"], "country_code")).filter(|c| !c.is_empty()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,6 +261,12 @@ mod tests {
         let g = json!([{"lat": "50.7726", "lon": "14.2128", "display_name": "Děčín, okres Děčín, Ústecký kraj, Česko"}]);
         assert_eq!(parse_geocode(&g), Some((50.7726, 14.2128)));
         assert_eq!(parse_geocode(&json!([])), None);
+
+        let p = json!([{"lat": "51.05", "lon": "13.74", "display_name": "Dresden, Sachsen, Deutschland",
+            "address": {"city": "Dresden", "country_code": "de"}}]);
+        let place = parse_place(&p).unwrap();
+        assert_eq!((place.name.as_str(), place.country.as_str()), ("Dresden, Sachsen", "de"));
+        assert_eq!(parse_place(&json!([])), None);
     }
 
     #[test]

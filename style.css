@@ -1219,6 +1219,78 @@ td.name {
   background: var(--accent-weak);
 }
 
+.search-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.note.warn {
+  background: var(--warn-weak);
+  border-color: transparent;
+  color: var(--warn);
+}
+
+.station {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.station.best {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.station.dim {
+  opacity: 0.6;
+}
+
+.st-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.st-price {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: 82px;
+}
+
+.st-price b {
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.station.best .st-price b {
+  color: var(--accent);
+}
+
+.st-price small {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.st-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.attribution {
+  text-align: center;
+}
+
 .currency-list {
   max-height: 300px;
   overflow-y: auto;
