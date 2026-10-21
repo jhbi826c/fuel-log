@@ -38,6 +38,17 @@ impl Route {
             },
         }
     }
+
+    /// Page name used for page-specific layout.
+    pub fn page(&self) -> &'static str {
+        match self {
+            Self::Overview => "overview",
+            Self::Records => "records",
+            Self::Add | Self::Edit(_) => "form",
+            Self::Prices => "prices",
+            Self::Settings => "settings",
+        }
+    }
 }
 
 /// Time span for the overview statistics.
@@ -267,7 +278,7 @@ pub fn App() -> impl IntoView {
                 .get()
                 .map(|e| view! { <div class="banner">{store.t().save_failed}" ("{e}")"</div> })
         }}
-        <main class="view">
+        <main class=move || format!("view page-{}", ui.route.with(Route::page))>
             {move || match ui.route.get() {
                 Route::Overview => view! { <Overview /> }.into_any(),
                 Route::Records => view! { <Records /> }.into_any(),

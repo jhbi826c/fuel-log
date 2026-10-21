@@ -204,7 +204,7 @@ fn StatsView(stats: Stats) -> impl IntoView {
 
     let yearly = (s.yearly.len() > 1).then(|| {
         view! {
-            <section class="card">
+            <section class="card half">
                 <h3>{t.yearly}</h3>
                 <div class="table-wrap">
                     <table>
@@ -244,7 +244,7 @@ fn StatsView(stats: Stats) -> impl IntoView {
 
     let group_table = |title: &'static str, first_col: &'static str, rows: &[crate::stats::GroupAgg], fallback: &'static str| {
         view! {
-            <section class="card">
+            <section class="card half">
                 <h3>{title}</h3>
                 <div class="table-wrap">
                     <table>
@@ -303,15 +303,15 @@ fn StatsView(stats: Stats) -> impl IntoView {
             </div>
         </section>
         <section class="kpis">{kpis.into_iter().collect_view()}</section>
-        <section class="card">
+        <section class="card half">
             <h3>{t.chart_consumption}</h3>
             <LineChart points=s.cons_series.clone() decimals=2 unit="L/100 km".to_string() avg=s.avg_cons />
         </section>
-        <section class="card">
+        <section class="card half">
             <h3>{t.chart_price}</h3>
             <LineChart points=s.price_series.clone() decimals=3 unit=format!("{cur}/L") avg=s.avg_price />
         </section>
-        <section class="card">
+        <section class="card half">
             <h3>{t.chart_monthly}</h3>
             <BarChart bars=bars />
         </section>

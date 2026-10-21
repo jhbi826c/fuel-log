@@ -114,9 +114,12 @@ fn cheapest(list: &[TkStation], fuel: TkFuel) -> Option<f64> {
     list.iter().filter_map(|st| st.price(fuel)).reduce(f64::min)
 }
 
+/// Scrolls an element into view only as far as needed.
 fn scroll_to(id: &str) {
     if let Some(el) = document().get_element_by_id(id) {
-        el.scroll_into_view_with_bool(true);
+        let opts = web_sys::ScrollIntoViewOptions::new();
+        opts.set_block(web_sys::ScrollLogicalPosition::Nearest);
+        el.scroll_into_view_with_scroll_into_view_options(&opts);
     }
 }
 
@@ -421,10 +424,14 @@ pub fn PricesView() -> impl IntoView {
             .into_any();
         }
         view! {
-            {controls}
+            <div class="prices-main">
+                {controls}
+                <div class="prices-results">
+                    {results}
+                    <p class="hint attribution">{t.tk_attribution}</p>
+                </div>
+            </div>
             {map}
-            {results}
-            <p class="hint attribution">{t.tk_attribution}</p>
         }
         .into_any()
     }

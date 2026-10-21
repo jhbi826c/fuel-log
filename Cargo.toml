@@ -41,6 +41,8 @@ features = [
   "PointerEvent",
   "PositionOptions",
   "RequestCache",
+  "ScrollIntoViewOptions",
+  "ScrollLogicalPosition",
   "Storage",
   "Url",
   "WheelEvent",
