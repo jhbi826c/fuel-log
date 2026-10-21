@@ -258,6 +258,16 @@ impl MapProvider {
         }
     }
 
+    /// Link that starts navigation to a point where the provider supports it.
+    pub fn route_url(self, lat: f64, lng: f64, label: &str) -> String {
+        match self {
+            Self::Google => format!("https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"),
+            Self::Apple => format!("https://maps.apple.com/?daddr={lat},{lng}&q={}", enc(label)),
+            Self::Osm => format!("https://www.openstreetmap.org/directions?to={lat},{lng}"),
+            Self::OsmAnd => self.point_url(lat, lng, label),
+        }
+    }
+
     /// Map link for a record's location or, failing that, its station name/address.
     pub fn url(self, r: &Record) -> Option<String> {
         let label = if r.station.is_empty() { "Fuel" } else { r.station.as_str() };

@@ -1,4 +1,5 @@
 mod form;
+mod map;
 mod overview;
 mod prices;
 mod records;

@@ -16,13 +16,13 @@ const CACHE_LEN: usize = 8;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TkFuel {
     #[default]
+    Diesel,
     E10,
     E5,
-    Diesel,
 }
 
 impl TkFuel {
-    pub const ALL: [TkFuel; 3] = [Self::E10, Self::E5, Self::Diesel];
+    pub const ALL: [TkFuel; 3] = [Self::Diesel, Self::E10, Self::E5];
 
     /// Matching name in `FUEL_TYPES`.
     pub fn name(self) -> &'static str {
@@ -33,15 +33,17 @@ impl TkFuel {
         }
     }
 
-    /// Best fit for a vehicle's fuel list.
+    /// Best fit for a vehicle's fuel list; Diesel unless the vehicle only takes petrol.
     pub fn for_vehicle(fuels: &[String]) -> Self {
         let has = |names: &[&str]| fuels.iter().any(|f| names.contains(&f.as_str()));
         if has(&["Diesel", "Premium Diesel"]) {
             Self::Diesel
-        } else if has(&["Super E10"]) || fuels.is_empty() {
+        } else if has(&["Super E10"]) {
             Self::E10
-        } else {
+        } else if has(&["Super E5", "Super Plus", "Super 100"]) {
             Self::E5
+        } else {
+            Self::Diesel
         }
     }
 }
@@ -202,7 +204,7 @@ mod tests {
         assert_eq!(s.address, "Margarete-Sommer-Str. 2, 10407 Berlin");
         assert_eq!((s.e5, s.e10, s.diesel), (Some(1.809), None, Some(1.659)));
         assert!(!s.is_open);
-        assert_eq!(s.to_station().fuels, ["Super E5", "Diesel"]);
+        assert_eq!(s.to_station().fuels, ["Diesel", "Super E5"]);
         assert_eq!(s.to_station().label(), "TotalEnergies Margarete-Sommer-Str.");
     }
 
@@ -220,6 +222,8 @@ mod tests {
         assert!(u.contains("rad=25") && u.contains("lat=52.52100") && u.ends_with("apikey=k"));
         assert_eq!(TkFuel::for_vehicle(&["Premium Diesel".into()]), TkFuel::Diesel);
         assert_eq!(TkFuel::for_vehicle(&["Super E5".into()]), TkFuel::E5);
-        assert_eq!(TkFuel::for_vehicle(&[]), TkFuel::E10);
+        assert_eq!(TkFuel::for_vehicle(&[]), TkFuel::Diesel);
+        assert_eq!(TkFuel::for_vehicle(&["LPG".into()]), TkFuel::Diesel);
+        assert_eq!(TkFuel::for_vehicle(&["Super E10".into()]), TkFuel::E10);
     }
 }

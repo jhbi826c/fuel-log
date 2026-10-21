@@ -43,6 +43,7 @@ features = [
   "RequestCache",
   "Storage",
   "Url",
+  "WheelEvent",
   "Window",
 ]
 
