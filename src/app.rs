@@ -182,6 +182,10 @@ pub fn sync_error_text(store: Store, e: &SyncError) -> String {
     match e {
         SyncError::NoToken => t.sync_err_no_token.into(),
         SyncError::Unauthorized => t.sync_err_unauthorized.into(),
+        SyncError::Forbidden(msg) if msg.is_empty() => t.sync_err_forbidden.into(),
+        SyncError::Forbidden(msg) => format!("{} ({msg})", t.sync_err_forbidden),
+        SyncError::NoRepo(repo) => fill(t.sync_err_no_repo, &[("repo", repo)]),
+        SyncError::Conflict => t.sync_err_conflict.into(),
         SyncError::Http(code, msg) => format!("{} ({code} {msg})", t.sync_err_http),
         SyncError::Network(msg) => format!("{} ({msg})", t.sync_err_network),
         SyncError::BadRemote(msg) => format!("{} ({msg})", t.sync_err_bad_remote),

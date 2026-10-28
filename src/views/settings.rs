@@ -7,9 +7,11 @@ use crate::i18n::{Lang, fill};
 use crate::model::{AppData, FUEL_TYPES, MapProvider, Theme};
 use crate::places::tankerkoenig::{self as tk, TkError};
 use crate::store::Store;
+use crate::sync::DEFAULT_REPO;
 use crate::{currency, format, web};
 
-const TOKEN_URL: &str = "https://github.com/settings/tokens/new?scopes=gist&description=Fuel%20Log";
+const TOKEN_URL: &str = "https://github.com/settings/tokens/new?scopes=repo&description=Fuel%20Log";
+const FINE_GRAINED_URL: &str = "https://github.com/settings/personal-access-tokens/new";
 const MAX_SYMBOL_LEN: usize = 5;
 
 /// Whether a search query can be used as-is as a custom currency symbol.
@@ -43,6 +45,7 @@ pub fn SettingsView() -> impl IntoView {
     let store = expect_context::<Store>();
     let ui = expect_context::<Ui>();
     let token_input = RwSignal::new(String::new());
+    let repo_input = RwSignal::new(store.sync.with_untracked(|c| c.repo.clone()));
     let tk_input = RwSignal::new(String::new());
     let tk_checking = RwSignal::new(false);
     let cur_open = RwSignal::new(false);
@@ -98,10 +101,11 @@ pub fn SettingsView() -> impl IntoView {
         if token.is_empty() {
             return;
         }
+        let repo = repo_input.get_untracked().trim().trim_matches('/').to_string();
         store.update_sync(|c| {
             c.token = token;
+            c.repo = repo;
             c.auto = true;
-            c.gist_id.clear();
         });
         token_input.set(String::new());
         run_sync(store, ui, false);
@@ -484,16 +488,34 @@ pub fn SettingsView() -> impl IntoView {
                         on:input=move |ev| token_input.set(event_target_value(&ev))
                     />
                 </label>
+                <label class="field">
+                    <span>{t.sync_repo}</span>
+                    <input
+                        type="text"
+                        autocomplete="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        placeholder=DEFAULT_REPO
+                        prop:value=move || repo_input.get()
+                        on:input=move |ev| repo_input.set(event_target_value(&ev))
+                    />
+                </label>
+                <p class="hint">
+                    {t.sync_repo_hint}" "
+                    <a href=FINE_GRAINED_URL target="_blank" rel="noopener">
+                        {t.sync_create_fine_grained}
+                    </a>
+                </p>
                 <button class="btn primary" on:click=connect>
                     {t.connect}
                 </button>
             }
             .into_any()
         } else {
-            let gist = (!conf.gist_id.is_empty()).then(|| {
+            let repo = conf.repo.contains('/').then(|| {
                 view! {
-                    <a href=format!("https://gist.github.com/{}", conf.gist_id) target="_blank" rel="noopener">
-                        "Gist ↗"
+                    <a href=format!("https://github.com/{}", conf.repo) target="_blank" rel="noopener">
+                        {t.open_repo}
                     </a>
                 }
             });
@@ -504,7 +526,7 @@ pub fn SettingsView() -> impl IntoView {
             };
             view! {
                 <p>
-                    <span class="badge good">{t.sync_connected}</span>" "{gist}
+                    <span class="badge good">{t.sync_connected}</span>" "{repo}
                 </p>
                 <p class="muted">{t.last_sync}": "{last}</p>
                 <label class="switch">

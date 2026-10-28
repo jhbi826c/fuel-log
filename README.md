@@ -21,7 +21,7 @@ UI languages: English, 中文, Deutsch.
 - **Several vehicles.**
 - **Data**:
   - Stored locally in the browser.
-  - Optional sync across devices through a private GitHub Gist.
+  - Optional sync across devices through a private GitHub repository.
   - Backup export and import as a JSON file.
 - **PWA**: can be added to the home screen and works offline.
 
@@ -53,13 +53,22 @@ The build uses relative URLs, so it works under any repository name.
 
 By default, data lives only in the browser where it was entered. To use the same data on several devices:
 
-1. Create a GitHub token with the `gist` scope ([direct link](https://github.com/settings/tokens/new?scopes=gist&description=Fuel%20Log)).
+1. Create a GitHub token with the `repo` scope ([direct link](https://github.com/settings/tokens/new?scopes=repo&description=Fuel%20Log)).
 2. In the app, open **Settings → Sync**, paste the token and connect.
 
-The data is then stored in a secret gist named `fuel-log.json`. Other devices that use a token from the same account find that gist automatically. Changes are merged per record (the newest edit wins, and deletions sync too).
+The first sync creates the private repository `fuel-log-data`; other devices find it with a token from the same account. To limit the token to one repository, create a private repository yourself, enter its name under **Repository**, and use a [fine-grained token](https://github.com/settings/personal-access-tokens/new) with access to only that repository and read and write permission for Contents.
+
+The repository holds the data as small files:
+
+```text
+vehicles.json        vehicles, one per line
+records/2026.json    fill-ups of that year, one per line
+```
+
+Each sync downloads only the files that differ from the local copy, merges, and pushes the changed files in one commit. Changes are merged per record (the newest edit wins, and deletions sync too). If another device pushes in between, the sync pulls and merges again.
 
 The token is stored only in the browser's local storage, never in the repository or in exports.
 
 ## Privacy
 
-The repository and the website contain only the app, never your data. Fill-ups stay in your browser and, if sync is enabled, in your own secret gist.
+The app's repository and the website contain only the app, never your data. Fill-ups stay in your browser and, if sync is enabled, in your own private data repository.

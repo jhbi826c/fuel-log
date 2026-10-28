@@ -393,12 +393,13 @@ impl Default for Settings {
     }
 }
 
-/// GitHub Gist sync configuration (per device, never exported).
+/// GitHub sync configuration (per device, never exported).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SyncConf {
     pub token: String,
-    pub gist_id: String,
+    /// Empty means the default repo.
+    pub repo: String,
     pub auto: bool,
     pub last_sync: f64,
 }
