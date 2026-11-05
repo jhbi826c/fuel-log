@@ -35,7 +35,11 @@ fn local_string(d: &Date) -> String {
 }
 
 pub fn browser_lang() -> Lang {
-    let l = window().navigator().language().unwrap_or_default().to_lowercase();
+    let l = window()
+        .navigator()
+        .language()
+        .unwrap_or_default()
+        .to_lowercase();
     if l.starts_with("zh") {
         Lang::Zh
     } else if l.starts_with("de") {
@@ -71,7 +75,10 @@ pub fn confirm(msg: &str) -> bool {
 }
 
 pub fn prompt(msg: &str, default: &str) -> Option<String> {
-    window().prompt_with_message_and_default(msg, default).ok().flatten()
+    window()
+        .prompt_with_message_and_default(msg, default)
+        .ok()
+        .flatten()
 }
 
 /// Saves `content` as a file download.
@@ -79,10 +86,17 @@ pub fn download(name: &str, content: &str, mime: &str) {
     let parts = Array::of1(&JsValue::from_str(content));
     let bag = BlobPropertyBag::new();
     bag.set_type(mime);
-    let Ok(blob) = Blob::new_with_str_sequence_and_options(&parts, &bag) else { return };
-    let Ok(url) = Url::create_object_url_with_blob(&blob) else { return };
+    let Ok(blob) = Blob::new_with_str_sequence_and_options(&parts, &bag) else {
+        return;
+    };
+    let Ok(url) = Url::create_object_url_with_blob(&blob) else {
+        return;
+    };
     let doc = window().document().expect("no document");
-    if let Ok(a) = doc.create_element("a").map(|e| e.unchecked_into::<HtmlAnchorElement>()) {
+    if let Ok(a) = doc
+        .create_element("a")
+        .map(|e| e.unchecked_into::<HtmlAnchorElement>())
+    {
         a.set_href(&url);
         a.set_download(name);
         if let Some(body) = doc.body() {
@@ -94,7 +108,8 @@ pub fn download(name: &str, content: &str, mime: &str) {
     let revoke = Closure::once_into_js(move || {
         let _ = Url::revoke_object_url(&url);
     });
-    let _ = window().set_timeout_with_callback_and_timeout_and_arguments_0(revoke.unchecked_ref(), 10_000);
+    let _ = window()
+        .set_timeout_with_callback_and_timeout_and_arguments_0(revoke.unchecked_ref(), 10_000);
 }
 
 pub async fn read_file(file: File) -> Result<String, String> {
@@ -111,7 +126,10 @@ fn get_f64(obj: &JsValue, key: &str) -> Option<f64> {
 
 /// Current position without a hard deadline.
 async fn geolocate_inner() -> Result<(f64, f64), String> {
-    let geo = window().navigator().geolocation().map_err(|_| "unavailable".to_string())?;
+    let geo = window()
+        .navigator()
+        .geolocation()
+        .map_err(|_| "unavailable".to_string())?;
     let promise = Promise::new(&mut |resolve: Function, reject: Function| {
         let ok = Closure::once_into_js(move |pos: JsValue| {
             let _ = resolve.call1(&JsValue::NULL, &pos);
@@ -187,7 +205,9 @@ pub async fn timeout<T>(ms: i32, fut: impl std::future::Future<Output = T>) -> R
 
 /// Forces light or dark colors, or follows the system when `None`.
 pub fn set_theme(theme: Option<&str>) {
-    let Some(el) = window().document().and_then(|d| d.document_element()) else { return };
+    let Some(el) = window().document().and_then(|d| d.document_element()) else {
+        return;
+    };
     let _ = match theme {
         Some(t) => el.set_attribute("data-theme", t),
         None => el.remove_attribute("data-theme"),

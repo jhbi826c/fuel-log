@@ -1,5 +1,5 @@
-use leptos::prelude::*;
 use leptos::html::Div;
+use leptos::prelude::*;
 
 use crate::format;
 use crate::stats::Point;
@@ -9,7 +9,11 @@ use crate::store::Store;
 pub fn nice_scale(min: f64, max: f64, n: usize) -> (f64, f64, Vec<f64>, usize) {
     let (mut min, mut max) = (min, max);
     if (max - min).abs() < f64::EPSILON {
-        let d = if min.abs() > 0.0 { min.abs() * 0.1 } else { 1.0 };
+        let d = if min.abs() > 0.0 {
+            min.abs() * 0.1
+        } else {
+            1.0
+        };
         min -= d;
         max += d;
     }
@@ -36,14 +40,19 @@ pub fn nice_scale(min: f64, max: f64, n: usize) -> (f64, f64, Vec<f64>, usize) {
         ticks.push((v / step).round() * step);
         v += step;
     }
-    let decimals = if step >= 1.0 { 0 } else { (-step.log10().floor()) as usize + usize::from(norm > 2.0 && norm <= 2.5) };
+    let decimals = if step >= 1.0 {
+        0
+    } else {
+        (-step.log10().floor()) as usize + usize::from(norm > 2.0 && norm <= 2.5)
+    };
     (lo, hi, ticks, decimals.min(4))
 }
 
 /// Horizontal pointer position within the plot, 0..1.
 fn pct_from_pointer(plot: NodeRef<Div>, ev: &leptos::ev::PointerEvent) -> Option<f64> {
     let rect = plot.get()?.get_bounding_client_rect();
-    (rect.width() > 0.0).then(|| ((ev.client_x() as f64 - rect.left()) / rect.width()).clamp(0.0, 1.0))
+    (rect.width() > 0.0)
+        .then(|| ((ev.client_x() as f64 - rect.left()) / rect.width()).clamp(0.0, 1.0))
 }
 
 fn edge_class(base: &str, pct: f64) -> String {
@@ -56,7 +65,13 @@ fn edge_class(base: &str, pct: f64) -> String {
     }
 }
 
-fn y_axis(ticks: &[f64], lo: f64, hi: f64, decimals: usize, lang: crate::i18n::Lang) -> impl IntoView {
+fn y_axis(
+    ticks: &[f64],
+    lo: f64,
+    hi: f64,
+    decimals: usize,
+    lang: crate::i18n::Lang,
+) -> impl IntoView {
     ticks
         .iter()
         .map(|v| {
@@ -79,7 +94,12 @@ fn grid_path(ticks: &[f64], lo: f64, hi: f64) -> String {
 
 /// Time series line chart.
 #[component]
-pub fn LineChart(points: Vec<Point>, decimals: usize, unit: String, avg: Option<f64>) -> impl IntoView {
+pub fn LineChart(
+    points: Vec<Point>,
+    decimals: usize,
+    unit: String,
+    avg: Option<f64>,
+) -> impl IntoView {
     let store = expect_context::<Store>();
     let lang = store.lang();
     let (Some(first), Some(last)) = (points.first(), points.last()) else {
@@ -103,11 +123,21 @@ pub fn LineChart(points: Vec<Point>, decimals: usize, unit: String, avg: Option<
     let line: String = points
         .iter()
         .enumerate()
-        .map(|(i, p)| format!("{}{:.1},{:.1}", if i == 0 { 'M' } else { 'L' }, px(p.x), py(p.y)))
+        .map(|(i, p)| {
+            format!(
+                "{}{:.1},{:.1}",
+                if i == 0 { 'M' } else { 'L' },
+                px(p.x),
+                py(p.y)
+            )
+        })
         .collect();
     let area = format!("{line}L{:.1},1000L{:.1},1000Z", px(last.x), px(first.x));
     let dots: String = if points.len() <= 80 {
-        points.iter().map(|p| format!("M{:.1},{:.1}h0", px(p.x), py(p.y))).collect()
+        points
+            .iter()
+            .map(|p| format!("M{:.1},{:.1}h0", px(p.x), py(p.y)))
+            .collect()
     } else {
         String::new()
     };
@@ -120,7 +150,11 @@ pub fn LineChart(points: Vec<Point>, decimals: usize, unit: String, avg: Option<
     );
 
     let n = points.len();
-    let mut label_idx: Vec<usize> = if n <= 4 { (0..n).collect() } else { vec![0, n / 3, 2 * n / 3, n - 1] };
+    let mut label_idx: Vec<usize> = if n <= 4 {
+        (0..n).collect()
+    } else {
+        vec![0, n / 3, 2 * n / 3, n - 1]
+    };
     label_idx.dedup();
     let x_labels = label_idx
         .into_iter()

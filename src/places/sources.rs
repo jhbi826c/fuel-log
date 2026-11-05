@@ -8,7 +8,10 @@ use crate::model::{FUEL_TYPES, enc};
 
 pub type Origin = (f64, f64);
 
-const OVERPASS: [&str; 2] = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+const OVERPASS: [&str; 2] = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+];
 const NOMINATIM: &str = "https://nominatim.openstreetmap.org";
 const TIMEOUT_MS: i32 = 12_000;
 /// How long to keep waiting for Overpass once Nominatim has answered.
@@ -27,17 +30,24 @@ pub(super) fn num(v: &Value) -> Option<f64> {
 }
 
 fn first_text(v: &Value, keys: &[&str]) -> String {
-    keys.iter().map(|k| text(v, k)).find(|s| !s.is_empty()).unwrap_or_default()
+    keys.iter()
+        .map(|k| text(v, k))
+        .find(|s| !s.is_empty())
+        .unwrap_or_default()
 }
 
 /// Fuel types a station is tagged with (`fuel:<key>=yes`), and whether it has any `fuel:*=yes` tag at all.
 fn tagged_fuels(tags: &Value) -> (Vec<&'static str>, bool) {
-    let any = tags
-        .as_object()
-        .is_some_and(|m| m.iter().any(|(k, v)| k.starts_with("fuel:") && v.as_str() == Some("yes")));
+    let any = tags.as_object().is_some_and(|m| {
+        m.iter()
+            .any(|(k, v)| k.starts_with("fuel:") && v.as_str() == Some("yes"))
+    });
     let known = FUEL_TYPES
         .iter()
-        .filter(|(_, keys)| keys.iter().any(|k| text(tags, &format!("fuel:{k}")) == "yes"))
+        .filter(|(_, keys)| {
+            keys.iter()
+                .any(|k| text(tags, &format!("fuel:{k}")) == "yes")
+        })
         .map(|(name, _)| *name)
         .collect();
     (known, any)
@@ -45,7 +55,14 @@ fn tagged_fuels(tags: &Value) -> (Vec<&'static str>, bool) {
 
 /// "Street 1, 01234 City".
 pub fn join_address(street: &str, number: &str, postcode: &str, city: &str) -> String {
-    let join = |parts: [&str; 2]| parts.iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join(" ");
+    let join = |parts: [&str; 2]| {
+        parts
+            .iter()
+            .filter(|s| !s.is_empty())
+            .copied()
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
     [join([street, number]), join([postcode, city])]
         .into_iter()
         .filter(|s| !s.is_empty())
@@ -73,7 +90,9 @@ pub fn overpass_query((lat, lng): Origin, radius_km: f64) -> String {
 }
 
 pub fn parse_overpass(v: &Value, origin: Origin) -> Result<Vec<Station>, String> {
-    let list = v["elements"].as_array().ok_or_else(|| first_text(v, &["remark", "error"]))?;
+    let list = v["elements"]
+        .as_array()
+        .ok_or_else(|| first_text(v, &["remark", "error"]))?;
     Ok(list
         .iter()
         .filter_map(|e| {
@@ -107,7 +126,17 @@ pub fn parse_overpass(v: &Value, origin: Origin) -> Result<Vec<Station>, String>
 }
 
 fn nominatim_city(a: &Value) -> String {
-    first_text(a, &["city", "town", "village", "hamlet", "municipality", "suburb"])
+    first_text(
+        a,
+        &[
+            "city",
+            "town",
+            "village",
+            "hamlet",
+            "municipality",
+            "suburb",
+        ],
+    )
 }
 
 pub fn nominatim_search_url((lat, lng): Origin, radius_km: f64) -> String {
@@ -134,9 +163,18 @@ pub fn parse_nominatim_search(v: &Value, origin: Origin) -> Result<Vec<Station>,
             let (fuels, fuel_tagged) = tagged_fuels(&s["extratags"]);
             Some(Station {
                 id: format!("osm:{}/{}", text(s, "osm_type"), text(s, "osm_id")),
-                name: if text(s, "name").is_empty() { brand.clone() } else { text(s, "name") },
+                name: if text(s, "name").is_empty() {
+                    brand.clone()
+                } else {
+                    text(s, "name")
+                },
                 brand,
-                address: join_address(&street, &text(a, "house_number"), &text(a, "postcode"), &nominatim_city(a)),
+                address: join_address(
+                    &street,
+                    &text(a, "house_number"),
+                    &text(a, "postcode"),
+                    &nominatim_city(a),
+                ),
                 street,
                 lat,
                 lng,
@@ -156,34 +194,54 @@ pub async fn osm_stations(origin: Origin, radius_km: f64) -> Result<Vec<Station>
     let query = enc(&overpass_query(origin, radius_km));
     let overpass = |base: &'static str| {
         let url = format!("{base}?data={query}");
-        async move { get_json(&url).await.and_then(|v| parse_overpass(&v, origin)) }
+        async move {
+            get_json(&url)
+                .await
+                .and_then(|v| parse_overpass(&v, origin))
+        }
     };
     let nominatim = async {
         get_json(&nominatim_search_url(origin, radius_km))
             .await
             .and_then(|v| parse_nominatim_search(&v, origin))
     };
-    let overpass = select_ok([Box::pin(overpass(OVERPASS[0])), Box::pin(overpass(OVERPASS[1]))]);
+    let overpass = select_ok([
+        Box::pin(overpass(OVERPASS[0])),
+        Box::pin(overpass(OVERPASS[1])),
+    ]);
     match select(overpass, Box::pin(nominatim)).await {
         Either::Left((Ok((list, _)), _)) => Ok(list),
         Either::Left((Err(e), nominatim)) => nominatim.await.map_err(|n| format!("{e}; {n}")),
-        Either::Right((Ok(list), overpass)) => match crate::web::timeout(OVERPASS_GRACE_MS, overpass).await {
-            Ok(Ok((better, _))) => Ok(better),
-            _ => Ok(list),
-        },
-        Either::Right((Err(n), overpass)) => overpass.await.map(|(list, _)| list).map_err(|e| format!("{e}; {n}")),
+        Either::Right((Ok(list), overpass)) => {
+            match crate::web::timeout(OVERPASS_GRACE_MS, overpass).await {
+                Ok(Ok((better, _))) => Ok(better),
+                _ => Ok(list),
+            }
+        }
+        Either::Right((Err(n), overpass)) => overpass
+            .await
+            .map(|(list, _)| list)
+            .map_err(|e| format!("{e}; {n}")),
     }
 }
 
 pub fn parse_reverse(v: &Value) -> Option<String> {
     let a = &v["address"];
-    let address = join_address(&text(a, "road"), &text(a, "house_number"), &text(a, "postcode"), &nominatim_city(a));
+    let address = join_address(
+        &text(a, "road"),
+        &text(a, "house_number"),
+        &text(a, "postcode"),
+        &nominatim_city(a),
+    );
     (!address.is_empty()).then_some(address)
 }
 
 /// Street address of a position.
 pub async fn reverse_geocode((lat, lng): Origin) -> Result<Option<String>, String> {
-    let v = get_json(&format!("{NOMINATIM}/reverse?format=jsonv2&lat={lat:.6}&lon={lng:.6}&zoom=18&addressdetails=1")).await?;
+    let v = get_json(&format!(
+        "{NOMINATIM}/reverse?format=jsonv2&lat={lat:.6}&lon={lng:.6}&zoom=18&addressdetails=1"
+    ))
+    .await?;
     Ok(parse_reverse(&v))
 }
 
@@ -195,7 +253,11 @@ pub fn parse_geocode(v: &Value) -> Option<(f64, f64)> {
 
 /// Position of an address or place name.
 pub async fn geocode(q: &str) -> Result<Option<(f64, f64)>, String> {
-    let v = get_json(&format!("{NOMINATIM}/search?q={}&format=jsonv2&limit=1", enc(q.trim()))).await?;
+    let v = get_json(&format!(
+        "{NOMINATIM}/search?q={}&format=jsonv2&limit=1",
+        enc(q.trim())
+    ))
+    .await?;
     Ok(parse_geocode(&v))
 }
 
@@ -210,19 +272,36 @@ pub struct Place {
 
 pub fn parse_place(v: &Value) -> Option<Place> {
     let p = v.as_array()?.first()?;
-    let name = text(p, "display_name").split(',').take(2).map(str::trim).collect::<Vec<_>>().join(", ");
-    Some(Place { lat: num(&p["lat"])?, lng: num(&p["lon"])?, name, country: text(&p["address"], "country_code") })
+    let name = text(p, "display_name")
+        .split(',')
+        .take(2)
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(Place {
+        lat: num(&p["lat"])?,
+        lng: num(&p["lon"])?,
+        name,
+        country: text(&p["address"], "country_code"),
+    })
 }
 
 /// Best match for an address or place name, with its country.
 pub async fn find_place(q: &str) -> Result<Option<Place>, String> {
-    let v = get_json(&format!("{NOMINATIM}/search?q={}&format=jsonv2&limit=1&addressdetails=1", enc(q.trim()))).await?;
+    let v = get_json(&format!(
+        "{NOMINATIM}/search?q={}&format=jsonv2&limit=1&addressdetails=1",
+        enc(q.trim())
+    ))
+    .await?;
     Ok(parse_place(&v))
 }
 
 /// Lowercase country code at a position; `None` outside any country.
 pub async fn country_at((lat, lng): Origin) -> Result<Option<String>, String> {
-    let v = get_json(&format!("{NOMINATIM}/reverse?format=jsonv2&lat={lat:.5}&lon={lng:.5}&zoom=3&addressdetails=1")).await?;
+    let v = get_json(&format!(
+        "{NOMINATIM}/reverse?format=jsonv2&lat={lat:.5}&lon={lng:.5}&zoom=3&addressdetails=1"
+    ))
+    .await?;
     Ok(Some(text(&v["address"], "country_code")).filter(|c| !c.is_empty()))
 }
 
@@ -255,7 +334,10 @@ mod tests {
         assert_eq!(s.address, "Loubská 83, 405 02 Děčín");
 
         let r = json!({"address": {"road": "Am Lagerplatz", "house_number": "2", "postcode": "01099", "city": "Dresden"}});
-        assert_eq!(parse_reverse(&r).as_deref(), Some("Am Lagerplatz 2, 01099 Dresden"));
+        assert_eq!(
+            parse_reverse(&r).as_deref(),
+            Some("Am Lagerplatz 2, 01099 Dresden")
+        );
         assert_eq!(parse_reverse(&json!({"error": "Unable to geocode"})), None);
 
         let g = json!([{"lat": "50.7726", "lon": "14.2128", "display_name": "Děčín, okres Děčín, Ústecký kraj, Česko"}]);
@@ -265,7 +347,10 @@ mod tests {
         let p = json!([{"lat": "51.05", "lon": "13.74", "display_name": "Dresden, Sachsen, Deutschland",
             "address": {"city": "Dresden", "country_code": "de"}}]);
         let place = parse_place(&p).unwrap();
-        assert_eq!((place.name.as_str(), place.country.as_str()), ("Dresden, Sachsen", "de"));
+        assert_eq!(
+            (place.name.as_str(), place.country.as_str()),
+            ("Dresden, Sachsen", "de")
+        );
         assert_eq!(parse_place(&json!([])), None);
     }
 

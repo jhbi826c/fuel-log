@@ -11,7 +11,9 @@ use crate::places::Station;
 use crate::stats::{Range, parse_dt};
 use crate::store::Store;
 use crate::sync::{SyncError, sync_once};
-use crate::views::{Icon, Overview, PriceState, PricesView, RecordForm, Records, SettingsView, icon};
+use crate::views::{
+    Icon, Overview, PriceState, PricesView, RecordForm, Records, SettingsView, icon,
+};
 use crate::web;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -70,16 +72,24 @@ impl Period {
         match self {
             Self::All => Range::default(),
             Self::Months(n) => Range {
-                from: parse_dt(today).and_then(|d| d.date().checked_sub_months(Months::new(n))).map(ymd),
+                from: parse_dt(today)
+                    .and_then(|d| d.date().checked_sub_months(Months::new(n)))
+                    .map(ymd),
                 to: None,
             },
-            Self::Year(y) => Range { from: Some(format!("{y:04}-01-01")), to: Some(format!("{:04}-01-01", y + 1)) },
+            Self::Year(y) => Range {
+                from: Some(format!("{y:04}-01-01")),
+                to: Some(format!("{:04}-01-01", y + 1)),
+            },
             Self::Custom(from, to) => {
                 let (from, to) = match (from, to) {
                     (Some(f), Some(t)) if f > t => (Some(t), Some(f)),
                     other => other,
                 };
-                Range { from: from.map(ymd), to: to.and_then(|d| d.succ_opt()).map(ymd) }
+                Range {
+                    from: from.map(ymd),
+                    to: to.and_then(|d| d.succ_opt()).map(ymd),
+                }
             }
         }
     }
@@ -119,8 +129,17 @@ impl Ui {
     fn show(&self, msg: String, undo: Vec<String>, error: bool) {
         let id = self.toast_seq.get_untracked() + 1;
         self.toast_seq.set(id);
-        let ms = if undo.is_empty() && !error { 3000 } else { 6000 };
-        self.toast.set(Some(Toast { id, msg, undo, error }));
+        let ms = if undo.is_empty() && !error {
+            3000
+        } else {
+            6000
+        };
+        self.toast.set(Some(Toast {
+            id,
+            msg,
+            undo,
+            error,
+        }));
         let toast = self.toast;
         set_timeout(
             move || {
@@ -146,7 +165,9 @@ impl Ui {
 }
 
 fn auto_sync_on(store: Store) -> bool {
-    store.sync.with_untracked(|c| c.auto && !c.token.trim().is_empty())
+    store
+        .sync
+        .with_untracked(|c| c.auto && !c.token.trim().is_empty())
 }
 
 /// Runs a sync in the background; repeats once if requested while running.
@@ -361,7 +382,6 @@ fn LangSelect() -> impl IntoView {
     }
 }
 
-
 #[component]
 fn VehicleSelect() -> impl IntoView {
     let store = expect_context::<Store>();
@@ -443,7 +463,11 @@ mod tests {
         assert!(y.contains("2025-12-31T23:59") && !y.contains("2026-01-01T00:00"));
         let d = |s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok();
         let c = Period::Custom(d("2026-03-10"), d("2026-02-01")).range("2026-05-31T10:00");
-        assert!(c.contains("2026-02-01T00:00") && c.contains("2026-03-10T23:59") && !c.contains("2026-03-11T00:00"));
+        assert!(
+            c.contains("2026-02-01T00:00")
+                && c.contains("2026-03-10T23:59")
+                && !c.contains("2026-03-11T00:00")
+        );
         let open = Period::Custom(d("2026-03-10"), None).range("2026-05-31T10:00");
         assert!(open.contains("2030-01-01T00:00") && !open.contains("2026-03-09T23:59"));
     }

@@ -30,8 +30,12 @@ pub struct Station {
 
 /// Whether `s` starts with the word `word` (case-insensitive).
 fn starts_with_word(s: &str, word: &str) -> bool {
-    s.get(..word.len()).is_some_and(|p| p.eq_ignore_ascii_case(word))
-        && s[word.len()..].chars().next().is_none_or(|c| !c.is_alphanumeric())
+    s.get(..word.len())
+        .is_some_and(|p| p.eq_ignore_ascii_case(word))
+        && s[word.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| !c.is_alphanumeric())
 }
 
 impl Station {
@@ -95,7 +99,10 @@ pub fn apply_own_names(list: &mut [Station], known: &[Known]) {
     for st in list.iter_mut() {
         let latest = known
             .iter()
-            .filter(|k| !k.name.trim().is_empty() && geo::distance_km((k.lat, k.lng), (st.lat, st.lng)) < SAME_STATION_KM)
+            .filter(|k| {
+                !k.name.trim().is_empty()
+                    && geo::distance_km((k.lat, k.lng), (st.lat, st.lng)) < SAME_STATION_KM
+            })
             .max_by(|a, b| a.date.cmp(b.date));
         if let Some(k) = latest {
             st.own_name = Some(k.name.trim().to_string());
@@ -107,8 +114,12 @@ pub fn apply_own_names(list: &mut [Station], known: &[Known]) {
 }
 
 /// Brands whose whole network was renamed after many OpenStreetMap entries were made: (former, current).
-const REBRANDS: [(&str, &str); 4] =
-    [("Benzina", "Orlen"), ("Total", "TotalEnergies"), ("Statoil", "Circle K"), ("DEA", "Shell")];
+const REBRANDS: [(&str, &str); 4] = [
+    ("Benzina", "Orlen"),
+    ("Total", "TotalEnergies"),
+    ("Statoil", "Circle K"),
+    ("DEA", "Shell"),
+];
 
 /// Search radii tried in turn until enough stations are found.
 const NEARBY_STEPS_KM: [f64; 3] = [2.0, 5.0, 10.0];
@@ -125,7 +136,11 @@ async fn within(origin: (f64, f64), radius_km: f64) -> Result<Vec<Station>, Stri
 }
 
 /// Nearest stations that may offer `wanted` fuels, widening the radius when few are found; returns the radius used.
-pub async fn nearby(origin: (f64, f64), limit: usize, wanted: &[String]) -> Result<(f64, Vec<Station>), String> {
+pub async fn nearby(
+    origin: (f64, f64),
+    limit: usize,
+    wanted: &[String],
+) -> Result<(f64, Vec<Station>), String> {
     let mut found = (NEARBY_STEPS_KM[0], Vec::new());
     for radius in NEARBY_STEPS_KM {
         let mut list = within(origin, radius).await?;
@@ -145,11 +160,26 @@ mod tests {
 
     #[test]
     fn labels() {
-        let s = Station { name: "Aral Tankstelle".into(), brand: "Aral".into(), street: "Hauptstr.".into(), ..Default::default() };
+        let s = Station {
+            name: "Aral Tankstelle".into(),
+            brand: "Aral".into(),
+            street: "Hauptstr.".into(),
+            ..Default::default()
+        };
         assert_eq!(s.label(), "Aral Hauptstr.");
-        let o = Station { name: "Benzina, Děčín".into(), ..Default::default() };
+        let o = Station {
+            name: "Benzina, Děčín".into(),
+            ..Default::default()
+        };
         assert_eq!(o.label(), "Benzina, Děčín");
-        assert_eq!(Station { brand: "OMV".into(), ..Default::default() }.title(), "OMV");
+        assert_eq!(
+            Station {
+                brand: "OMV".into(),
+                ..Default::default()
+            }
+            .title(),
+            "OMV"
+        );
     }
 
     #[test]
@@ -164,18 +194,40 @@ mod tests {
         assert_eq!(s.title(), "Orlen, Ústí nad Labem, Předmostí");
         assert_eq!(s.label(), "Orlen Předmostí");
         assert_eq!(s.renamed_from, Some("Benzina"));
-        let named_only = Station { name: "BENZINA Plus".into(), ..Default::default() }.apply_rebrands();
+        let named_only = Station {
+            name: "BENZINA Plus".into(),
+            ..Default::default()
+        }
+        .apply_rebrands();
         assert_eq!(named_only.title(), "Orlen Plus");
-        let other = Station { name: "Shell".into(), brand: "Shell".into(), ..Default::default() }.apply_rebrands();
+        let other = Station {
+            name: "Shell".into(),
+            brand: "Shell".into(),
+            ..Default::default()
+        }
+        .apply_rebrands();
         assert_eq!((other.title(), other.renamed_from), ("Shell".into(), None));
     }
 
     #[test]
     fn rebrands_match_whole_words_only() {
-        let rb = |name: &str, brand: &str| Station { name: name.into(), brand: brand.into(), ..Default::default() }.apply_rebrands();
+        let rb = |name: &str, brand: &str| {
+            Station {
+                name: name.into(),
+                brand: brand.into(),
+                ..Default::default()
+            }
+            .apply_rebrands()
+        };
         assert_eq!(rb("Total", "Total").title(), "TotalEnergies");
-        assert_eq!(rb("TotalEnergies Berlin", "TotalEnergies").renamed_from, None);
-        assert_eq!(rb("TotalEnergies Berlin", "TotalEnergies").title(), "TotalEnergies Berlin");
+        assert_eq!(
+            rb("TotalEnergies Berlin", "TotalEnergies").renamed_from,
+            None
+        );
+        assert_eq!(
+            rb("TotalEnergies Berlin", "TotalEnergies").title(),
+            "TotalEnergies Berlin"
+        );
         assert_eq!(rb("Statoil Oslo", "").title(), "Circle K Oslo");
         assert_eq!(rb("DEAL Tankstelle", "").renamed_from, None);
         assert_eq!(rb("Agip", "Agip").title(), "Agip");
@@ -184,12 +236,35 @@ mod tests {
     #[test]
     fn own_names_win() {
         let mut list = vec![
-            Station { name: "Lotos".into(), lat: 52.0, lng: 21.0, address: "OSM street".into(), ..Default::default() },
-            Station { name: "Far away".into(), lat: 52.1, lng: 21.0, ..Default::default() },
+            Station {
+                name: "Lotos".into(),
+                lat: 52.0,
+                lng: 21.0,
+                address: "OSM street".into(),
+                ..Default::default()
+            },
+            Station {
+                name: "Far away".into(),
+                lat: 52.1,
+                lng: 21.0,
+                ..Default::default()
+            },
         ];
         let known = [
-            Known { lat: 52.0005, lng: 21.0, name: "Orlen Warszawa", address: "ul. Prosta 1", date: "2026-01-01T10:00" },
-            Known { lat: 52.0, lng: 21.0005, name: "Orlen Prosta", address: "", date: "2026-03-01T10:00" },
+            Known {
+                lat: 52.0005,
+                lng: 21.0,
+                name: "Orlen Warszawa",
+                address: "ul. Prosta 1",
+                date: "2026-01-01T10:00",
+            },
+            Known {
+                lat: 52.0,
+                lng: 21.0005,
+                name: "Orlen Prosta",
+                address: "",
+                date: "2026-03-01T10:00",
+            },
         ];
         apply_own_names(&mut list, &known);
         assert_eq!(list[0].title(), "Orlen Prosta");
@@ -201,12 +276,23 @@ mod tests {
     #[test]
     fn fuel_filter() {
         let want = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        let diesel_only = Station { fuels: vec!["Diesel"], fuel_tagged: true, ..Default::default() };
-        let hydrogen = Station { fuel_tagged: true, ..Default::default() };
+        let diesel_only = Station {
+            fuels: vec!["Diesel"],
+            fuel_tagged: true,
+            ..Default::default()
+        };
+        let hydrogen = Station {
+            fuel_tagged: true,
+            ..Default::default()
+        };
         let untagged = Station::default();
         assert!(diesel_only.may_offer(&want(&["Diesel"])));
         assert!(!diesel_only.may_offer(&want(&["Super E10", "Super E5"])));
-        let czech = Station { fuels: vec!["Super E5", "Super Plus", "Diesel"], fuel_tagged: true, ..Default::default() };
+        let czech = Station {
+            fuels: vec!["Super E5", "Super Plus", "Diesel"],
+            fuel_tagged: true,
+            ..Default::default()
+        };
         assert!(czech.may_offer(&want(&["Super E10"])));
         assert!(!czech.may_offer(&want(&["LPG"])));
         assert!(!hydrogen.may_offer(&want(&["Diesel"])));

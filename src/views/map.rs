@@ -50,7 +50,8 @@ impl MapView {
     pub fn fit(&self, center: (f64, f64), radius_km: f64) {
         let (w, h) = self.size.get_untracked();
         let px = if w > 0.0 { w.min(h) * 0.85 } else { 300.0 };
-        self.zoom.set(zoom_for_km(2.0 * radius_km, px, center.0).clamp(3.0, MAX_ZOOM));
+        self.zoom
+            .set(zoom_for_km(2.0 * radius_km, px, center.0).clamp(3.0, MAX_ZOOM));
         self.center.set(center);
         self.moved.set(false);
     }
@@ -75,7 +76,10 @@ struct Gesture {
 
 fn mid_dist(ps: &[(i32, f64, f64)]) -> ((f64, f64), f64) {
     let n = ps.len().max(1) as f64;
-    let mid = (ps.iter().map(|p| p.1).sum::<f64>() / n, ps.iter().map(|p| p.2).sum::<f64>() / n);
+    let mid = (
+        ps.iter().map(|p| p.1).sum::<f64>() / n,
+        ps.iter().map(|p| p.2).sum::<f64>() / n,
+    );
     let dist = match ps {
         [a, b, ..] => ((a.1 - b.1).powi(2) + (a.2 - b.2).powi(2)).sqrt(),
         _ => 0.0,
@@ -125,8 +129,17 @@ pub fn SlippyMap(
         let z0 = view.zoom.get_untracked();
         let c = project(view.center.get_untracked());
         let h = half();
-        let p = (c.0 + (at.0 - h.0) / world(z0), c.1 + (at.1 - h.1) / world(z0));
-        set_view((p.0 - (at.0 - h.0) / world(zoom), p.1 - (at.1 - h.1) / world(zoom)), zoom);
+        let p = (
+            c.0 + (at.0 - h.0) / world(z0),
+            c.1 + (at.1 - h.1) / world(z0),
+        );
+        set_view(
+            (
+                p.0 - (at.0 - h.0) / world(zoom),
+                p.1 - (at.1 - h.1) / world(zoom),
+            ),
+            zoom,
+        );
         view.moved.set(true);
     };
     let local = move |x: i32, y: i32| {
@@ -143,7 +156,8 @@ pub fn SlippyMap(
             view.size.set((r.width(), r.height()));
             if !view.ready.get_untracked() && r.width() > 0.0 {
                 view.ready.set(true);
-                view.zoom.set(bounds.fit_zoom(r.width(), r.height()).max(min_zoom));
+                view.zoom
+                    .set(bounds.fit_zoom(r.width(), r.height()).max(min_zoom));
                 view.center.set(bounds.center());
             }
         }
@@ -161,7 +175,13 @@ pub fn SlippyMap(
         let moved = gesture.get_value().is_some_and(|g| g.moved);
         gesture.set_value((!ps.is_empty()).then(|| {
             let (mid, dist) = mid_dist(&ps);
-            Gesture { center: project(view.center.get_untracked()), zoom: view.zoom.get_untracked(), mid, dist, moved }
+            Gesture {
+                center: project(view.center.get_untracked()),
+                zoom: view.zoom.get_untracked(),
+                mid,
+                dist,
+                moved,
+            }
         }));
     };
     let on_down = move |e: PointerEvent| {
@@ -189,7 +209,9 @@ pub fn SlippyMap(
                 (q.1, q.2) = p;
             }
         });
-        let Some(mut g) = gesture.get_value() else { return };
+        let Some(mut g) = gesture.get_value() else {
+            return;
+        };
         let ps = pointers.get_value();
         let (mid, dist) = mid_dist(&ps);
         if !g.moved {
@@ -205,11 +227,24 @@ pub fn SlippyMap(
                 }
             }
         }
-        let zoom = if ps.len() >= 2 && g.dist > 0.0 { g.zoom + (dist / g.dist).log2() } else { g.zoom };
+        let zoom = if ps.len() >= 2 && g.dist > 0.0 {
+            g.zoom + (dist / g.dist).log2()
+        } else {
+            g.zoom
+        };
         let zoom = zoom.clamp(min_zoom, MAX_ZOOM);
         let h = half();
-        let anchor = (g.center.0 + (g.mid.0 - h.0) / world(g.zoom), g.center.1 + (g.mid.1 - h.1) / world(g.zoom));
-        set_view((anchor.0 - (mid.0 - h.0) / world(zoom), anchor.1 - (mid.1 - h.1) / world(zoom)), zoom);
+        let anchor = (
+            g.center.0 + (g.mid.0 - h.0) / world(g.zoom),
+            g.center.1 + (g.mid.1 - h.1) / world(g.zoom),
+        );
+        set_view(
+            (
+                anchor.0 - (mid.0 - h.0) / world(zoom),
+                anchor.1 - (mid.1 - h.1) / world(zoom),
+            ),
+            zoom,
+        );
         view.moved.set(true);
     };
     let on_up = move |e: PointerEvent| {
@@ -223,14 +258,26 @@ pub fn SlippyMap(
     let on_wheel = move |e: WheelEvent| {
         e.prevent_default();
         let dy = e.delta_y() * if e.delta_mode() == 1 { 16.0 } else { 1.0 };
-        zoom_at(local(e.client_x(), e.client_y()), view.zoom.get_untracked() - dy * 0.002);
+        zoom_at(
+            local(e.client_x(), e.client_y()),
+            view.zoom.get_untracked() - dy * 0.002,
+        );
     };
-    let on_dblclick = move |e: MouseEvent| zoom_at(local(e.client_x(), e.client_y()), view.zoom.get_untracked() + 1.0);
+    let on_dblclick = move |e: MouseEvent| {
+        zoom_at(
+            local(e.client_x(), e.client_y()),
+            view.zoom.get_untracked() + 1.0,
+        )
+    };
     let on_click = move |e: MouseEvent| {
         let on_control = e
             .target()
             .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
-            .and_then(|t| t.closest(".map-marker, .map-popup, .map-zoom, .map-overlay, .map-attrib").ok().flatten())
+            .and_then(|t| {
+                t.closest(".map-marker, .map-popup, .map-zoom, .map-overlay, .map-attrib")
+                    .ok()
+                    .flatten()
+            })
             .is_some();
         if !dragged.get_value() && !on_control {
             on_background.run(());
@@ -258,7 +305,9 @@ pub fn SlippyMap(
         let c = project(view.center.get());
         let (cx, cy) = (c.0 * TILE * n as f64, c.1 * TILE * n as f64);
         let (hw, hh) = (w / 2.0 / scale, h / 2.0 / scale);
-        let range = |a: f64, b: f64| ((a / TILE).floor() as i64).max(0)..=((b / TILE).floor() as i64).min(n - 1);
+        let range = |a: f64, b: f64| {
+            ((a / TILE).floor() as i64).max(0)..=((b / TILE).floor() as i64).min(n - 1)
+        };
         let ys = range(cy - hh, cy + hh);
         range(cx - hw, cx + hw)
             .flat_map(|x| ys.clone().map(move |y| (z, x, y)))
@@ -272,7 +321,10 @@ pub fn SlippyMap(
         let (w, h) = view.size.get();
         let left = (x as f64 * TILE - c.0 * TILE * n) * scale + w / 2.0;
         let top = (y as f64 * TILE - c.1 * TILE * n) * scale + h / 2.0;
-        format!("transform:translate({left:.1}px,{top:.1}px);width:{0:.1}px;height:{0:.1}px", TILE * scale + 0.5)
+        format!(
+            "transform:translate({left:.1}px,{top:.1}px);width:{0:.1}px;height:{0:.1}px",
+            TILE * scale + 0.5
+        )
     };
 
     let circle_view = move || {

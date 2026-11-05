@@ -56,7 +56,11 @@ pub fn SettingsView() -> impl IntoView {
         data.records.retain(|r| !r.deleted);
         data.vehicles.retain(|v| !v.deleted);
         let json = serde_json::to_string_pretty(&data).unwrap_or_default();
-        web::download(&format!("fuel-log-{}.json", today()), &json, "application/json");
+        web::download(
+            &format!("fuel-log-{}.json", today()),
+            &json,
+            "application/json",
+        );
     };
 
     let import_json = move |ev: leptos::ev::Event| {
@@ -78,7 +82,11 @@ pub fn SettingsView() -> impl IntoView {
 
     let remove_demo = move |_| {
         let ids: Vec<String> = store.data.with_untracked(|d| {
-            d.records.iter().filter(|r| r.demo && !r.deleted).map(|r| r.id.clone()).collect()
+            d.records
+                .iter()
+                .filter(|r| r.demo && !r.deleted)
+                .map(|r| r.id.clone())
+                .collect()
         });
         store.delete_records(&ids);
         ui.toast_undo(store.t().demo_removed, ids);
@@ -90,7 +98,11 @@ pub fn SettingsView() -> impl IntoView {
             return;
         }
         let ids: Vec<String> = store.data.with_untracked(|d| {
-            d.records.iter().filter(|r| !r.deleted).map(|r| r.id.clone()).collect()
+            d.records
+                .iter()
+                .filter(|r| !r.deleted)
+                .map(|r| r.id.clone())
+                .collect()
         });
         store.delete_records(&ids);
         ui.toast_undo(t.all_deleted, ids);
@@ -101,7 +113,11 @@ pub fn SettingsView() -> impl IntoView {
         if token.is_empty() {
             return;
         }
-        let repo = repo_input.get_untracked().trim().trim_matches('/').to_string();
+        let repo = repo_input
+            .get_untracked()
+            .trim()
+            .trim_matches('/')
+            .to_string();
         store.update_sync(|c| {
             c.token = token;
             c.repo = repo;
@@ -130,7 +146,10 @@ pub fn SettingsView() -> impl IntoView {
     let close_currency = move || {
         cur_open.set(false);
         cur_query.set(String::new());
-        if let Some(el) = document().active_element().and_then(|e| e.dyn_into::<web_sys::HtmlElement>().ok()) {
+        if let Some(el) = document()
+            .active_element()
+            .and_then(|e| e.dyn_into::<web_sys::HtmlElement>().ok())
+        {
             let _ = el.blur();
         }
     };
@@ -291,7 +310,12 @@ pub fn SettingsView() -> impl IntoView {
         let many = vs.len() > 1;
         let counts = store.data.with(|d| {
             vs.iter()
-                .map(|v| d.records.iter().filter(|r| !r.deleted && r.vehicle_id == v.id).count())
+                .map(|v| {
+                    d.records
+                        .iter()
+                        .filter(|r| !r.deleted && r.vehicle_id == v.id)
+                        .count()
+                })
                 .collect::<Vec<_>>()
         });
         view! {
@@ -386,7 +410,11 @@ pub fn SettingsView() -> impl IntoView {
                 checked => match store.set_tk_key(&key) {
                     Ok(()) => {
                         tk_input.set(String::new());
-                        ui.toast(if checked.is_ok() { t.tk_key_ok } else { t.tk_key_unchecked });
+                        ui.toast(if checked.is_ok() {
+                            t.tk_key_ok
+                        } else {
+                            t.tk_key_unchecked
+                        });
                     }
                     Err(e) => ui.error(format!("{} ({e})", t.save_failed)),
                 },

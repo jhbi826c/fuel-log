@@ -15,7 +15,12 @@ use crate::web;
 
 /// Country covered by the price source.
 const COUNTRY: &str = "de";
-const GERMANY: Bounds = Bounds { south: 47.2, west: 5.8, north: 55.1, east: 15.1 };
+const GERMANY: Bounds = Bounds {
+    south: 47.2,
+    west: 5.8,
+    north: 55.1,
+    east: 15.1,
+};
 const MIN_ZOOM: f64 = 5.0;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -64,7 +69,13 @@ impl Default for PriceState {
 }
 
 /// Looks up prices around `origin` unless `country` is known to be outside the covered one.
-fn run_search(store: Store, ps: PriceState, origin: (f64, f64), label: String, country: Option<String>) {
+fn run_search(
+    store: Store,
+    ps: PriceState,
+    origin: (f64, f64),
+    label: String,
+    country: Option<String>,
+) {
     let radius = ps.radius.get_untracked();
     let key = store.tk_key.get_untracked();
     ps.loading.set(true);
@@ -81,7 +92,12 @@ fn run_search(store: Store, ps: PriceState, origin: (f64, f64), label: String, c
             ps.map.fit(origin, radius as f64);
         }
         ps.selected.set(None);
-        ps.search.set(Some(PriceSearch { origin, label, radius, outcome }));
+        ps.search.set(Some(PriceSearch {
+            origin,
+            label,
+            radius,
+            outcome,
+        }));
         ps.loading.set(false);
     });
 }
@@ -90,12 +106,20 @@ fn run_search(store: Store, ps: PriceState, origin: (f64, f64), label: String, c
 fn search_at(store: Store, ps: PriceState, origin: (f64, f64), label: String) {
     ps.loading.set(true);
     spawn_local(async move {
-        let country = places::country_at(origin).await.ok().map(Option::unwrap_or_default);
+        let country = places::country_at(origin)
+            .await
+            .ok()
+            .map(Option::unwrap_or_default);
         run_search(store, ps, origin, label, country);
     });
 }
 
-fn sorted(mut list: Vec<TkStation>, fuel: TkFuel, by_distance: bool, only_open: bool) -> Vec<TkStation> {
+fn sorted(
+    mut list: Vec<TkStation>,
+    fuel: TkFuel,
+    by_distance: bool,
+    only_open: bool,
+) -> Vec<TkStation> {
     if only_open {
         list.retain(|s| s.is_open);
     }
@@ -104,7 +128,9 @@ fn sorted(mut list: Vec<TkStation>, fuel: TkFuel, by_distance: bool, only_open: 
         if by_distance {
             a.dist_km.total_cmp(&b.dist_km)
         } else {
-            price(a).total_cmp(&price(b)).then(a.dist_km.total_cmp(&b.dist_km))
+            price(a)
+                .total_cmp(&price(b))
+                .then(a.dist_km.total_cmp(&b.dist_km))
         }
     });
     list
@@ -130,10 +156,17 @@ pub fn PricesView() -> impl IntoView {
     let ps = ui.prices;
 
     let fuel = Memo::new(move |_| {
-        ps.fuel.get().unwrap_or_else(|| TkFuel::for_vehicle(&store.vehicle_fuels(&store.active_vehicle())))
+        ps.fuel
+            .get()
+            .unwrap_or_else(|| TkFuel::for_vehicle(&store.vehicle_fuels(&store.active_vehicle())))
     });
     let visible = Memo::new(move |_| match ps.search.get()?.outcome {
-        Outcome::Found(list) => Some(sorted(list, fuel.get(), ps.by_distance.get(), ps.only_open.get())),
+        Outcome::Found(list) => Some(sorted(
+            list,
+            fuel.get(),
+            ps.by_distance.get(),
+            ps.only_open.get(),
+        )),
         _ => None,
     });
 
@@ -273,7 +306,9 @@ pub fn PricesView() -> impl IntoView {
     };
 
     let markers = Signal::derive(move || {
-        let Some(list) = visible.get() else { return Vec::new() };
+        let Some(list) = visible.get() else {
+            return Vec::new();
+        };
         let l = store.lang();
         let f = fuel.get();
         let best = cheapest(&list, f);
@@ -285,7 +320,9 @@ pub fn PricesView() -> impl IntoView {
                     id: st.id.clone(),
                     lat: st.lat,
                     lng: st.lng,
-                    label: price.map(|p| num(l, p, 3)).unwrap_or_else(|| DASH.to_string()),
+                    label: price
+                        .map(|p| num(l, p, 3))
+                        .unwrap_or_else(|| DASH.to_string()),
                     class: match (price.is_some() && price == best, price.is_some()) {
                         (true, _) => "best",
                         (false, true) => "",
@@ -297,19 +334,27 @@ pub fn PricesView() -> impl IntoView {
             .collect()
     });
     let circle = Signal::derive(move || {
-        ps.search.with(|s| s.as_ref().filter(|s| s.outcome != Outcome::OutOfRange).map(|s| (s.origin, s.radius as f64)))
+        ps.search.with(|s| {
+            s.as_ref()
+                .filter(|s| s.outcome != Outcome::OutOfRange)
+                .map(|s| (s.origin, s.radius as f64))
+        })
     });
     let selected_station = Memo::new(move |_| {
         let id = ps.selected.get()?;
         visible.with(|v| v.as_ref()?.iter().find(|s| s.id == id).cloned())
     });
     let on_select = Callback::new(move |id: String| {
-        if let Some(st) = visible.with_untracked(|v| v.as_ref().and_then(|v| v.iter().find(|s| s.id == id).cloned())) {
+        if let Some(st) = visible.with_untracked(|v| {
+            v.as_ref()
+                .and_then(|v| v.iter().find(|s| s.id == id).cloned())
+        }) {
             ps.map.focus((st.lat, st.lng));
         }
         ps.selected.set(Some(id));
     });
-    let popup_at = Signal::derive(move || selected_station.with(|s| s.as_ref().map(|s| (s.lat, s.lng))));
+    let popup_at =
+        Signal::derive(move || selected_station.with(|s| s.as_ref().map(|s| (s.lat, s.lng))));
     let popup = move || {
         let st = selected_station.get()?;
         let f = fuel.get();
@@ -366,7 +411,9 @@ pub fn PricesView() -> impl IntoView {
         let l = store.lang();
         let total = match &s.outcome {
             Outcome::OutOfRange => {
-                return Some(view! { <p class="card note warn">{t.tk_out_of_range}</p> }.into_any());
+                return Some(
+                    view! { <p class="card note warn">{t.tk_out_of_range}</p> }.into_any(),
+                );
             }
             Outcome::Failed(TkError::InvalidKey) => {
                 return Some(
@@ -379,7 +426,10 @@ pub fn PricesView() -> impl IntoView {
                 );
             }
             Outcome::Failed(TkError::Api(e) | TkError::Network(e)) => {
-                return Some(view! { <p class="card note warn">{t.tk_failed}" ("{e.clone()}")"</p> }.into_any());
+                return Some(
+                    view! { <p class="card note warn">{t.tk_failed}" ("{e.clone()}")"</p> }
+                        .into_any(),
+                );
             }
             Outcome::Found(list) if list.is_empty() => {
                 return Some(view! { <p class="card note">{t.tk_none_found}</p> }.into_any());
@@ -446,7 +496,13 @@ fn named_stations(store: Store, list: &[TkStation]) -> Vec<Station> {
             .filter(|r| !r.deleted)
             .filter_map(|r| {
                 let (lat, lng) = r.coords()?;
-                Some(Known { lat, lng, name: &r.station, address: &r.address, date: &r.date })
+                Some(Known {
+                    lat,
+                    lng,
+                    name: &r.station,
+                    address: &r.address,
+                    date: &r.date,
+                })
             })
             .collect();
         let mut stations: Vec<Station> = list.iter().map(TkStation::to_station).collect();
@@ -457,27 +513,48 @@ fn named_stations(store: Store, list: &[TkStation]) -> Vec<Station> {
 
 fn display_title(store: Store, station: &Station) -> String {
     let title = station.title();
-    if title.is_empty() { store.t().unnamed_station.to_string() } else { title }
+    if title.is_empty() {
+        store.t().unnamed_station.to_string()
+    } else {
+        title
+    }
 }
 
 /// Brand logo, or the brand's first letter when there is none.
 fn brand_mark(st: &TkStation) -> impl IntoView + use<> {
     match brands::logo(&st.brand, &st.name) {
         Some(src) => view! { <img class="brand-logo" src=src alt=st.brand.clone() /> }.into_any(),
-        None => view! { <span class="brand-logo letter">{brands::initial(&st.brand, &st.name)}</span> }.into_any(),
+        None => {
+            view! { <span class="brand-logo letter">{brands::initial(&st.brand, &st.name)}</span> }
+                .into_any()
+        }
     }
 }
 
 fn route_url(store: Store, st: &TkStation, title: &str) -> String {
-    store.settings.with_untracked(|s| s.map_provider).route_url(st.lat, st.lng, title)
+    store
+        .settings
+        .with_untracked(|s| s.map_provider)
+        .route_url(st.lat, st.lng, title)
 }
 
 fn fill_here(ui: Ui, station: &Station, fuel: TkFuel, price: Option<f64>) {
-    ui.prefill.set(Some(Prefill { station: station.clone(), fuel: fuel.name(), price }));
+    ui.prefill.set(Some(Prefill {
+        station: station.clone(),
+        fuel: fuel.name(),
+        price,
+    }));
     web::navigate("#/add");
 }
 
-fn station_popup(store: Store, ui: Ui, st: TkStation, station: Station, fuel: TkFuel, best: Option<f64>) -> impl IntoView {
+fn station_popup(
+    store: Store,
+    ui: Ui,
+    st: TkStation,
+    station: Station,
+    fuel: TkFuel,
+    best: Option<f64>,
+) -> impl IntoView {
     let t = store.t();
     let l = store.lang();
     let title = display_title(store, &station);
@@ -538,7 +615,14 @@ fn station_popup(store: Store, ui: Ui, st: TkStation, station: Station, fuel: Tk
     }
 }
 
-fn station_card(store: Store, ui: Ui, st: TkStation, station: Station, fuel: TkFuel, best: Option<f64>) -> impl IntoView {
+fn station_card(
+    store: Store,
+    ui: Ui,
+    st: TkStation,
+    station: Station,
+    fuel: TkFuel,
+    best: Option<f64>,
+) -> impl IntoView {
     let t = store.t();
     let l = store.lang();
     let ps = ui.prices;
@@ -613,16 +697,36 @@ mod tests {
     use super::*;
 
     fn st(id: &str, dist: f64, e10: Option<f64>, open: bool) -> TkStation {
-        TkStation { id: id.into(), dist_km: dist, e10, is_open: open, ..Default::default() }
+        TkStation {
+            id: id.into(),
+            dist_km: dist,
+            e10,
+            is_open: open,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn sorting() {
-        let list = vec![st("a", 1.0, Some(1.80), true), st("b", 2.0, Some(1.70), true), st("c", 0.5, None, true), st("d", 0.1, Some(1.6), false)];
+        let list = vec![
+            st("a", 1.0, Some(1.80), true),
+            st("b", 2.0, Some(1.70), true),
+            st("c", 0.5, None, true),
+            st("d", 0.1, Some(1.6), false),
+        ];
         let ids = |v: Vec<TkStation>| v.into_iter().map(|s| s.id).collect::<Vec<_>>();
-        assert_eq!(ids(sorted(list.clone(), TkFuel::E10, false, true)), ["b", "a", "c"]);
-        assert_eq!(ids(sorted(list.clone(), TkFuel::E10, true, true)), ["c", "a", "b"]);
-        assert_eq!(ids(sorted(list.clone(), TkFuel::E10, false, false)), ["d", "b", "a", "c"]);
+        assert_eq!(
+            ids(sorted(list.clone(), TkFuel::E10, false, true)),
+            ["b", "a", "c"]
+        );
+        assert_eq!(
+            ids(sorted(list.clone(), TkFuel::E10, true, true)),
+            ["c", "a", "b"]
+        );
+        assert_eq!(
+            ids(sorted(list.clone(), TkFuel::E10, false, false)),
+            ["d", "b", "a", "c"]
+        );
         assert_eq!(cheapest(&list, TkFuel::E10), Some(1.6));
     }
 }

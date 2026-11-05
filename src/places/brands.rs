@@ -25,8 +25,12 @@ const LOGOS: [(&str, &[&str]); 21] = [
 
 /// Whether `s` starts with `word` followed by a non-alphanumeric character or the end (case-insensitive).
 fn starts_with_word(s: &str, word: &str) -> bool {
-    s.get(..word.len()).is_some_and(|p| p.eq_ignore_ascii_case(word))
-        && s[word.len()..].chars().next().is_none_or(|c| !c.is_alphanumeric())
+    s.get(..word.len())
+        .is_some_and(|p| p.eq_ignore_ascii_case(word))
+        && s[word.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| !c.is_alphanumeric())
 }
 
 /// Logo path for a station, matched on its brand or the start of its name.
@@ -35,14 +39,24 @@ pub fn logo(brand: &str, name: &str) -> Option<String> {
     LOGOS
         .iter()
         .find(|(_, names)| names.iter().any(|n| brand.eq_ignore_ascii_case(n)))
-        .or_else(|| LOGOS.iter().find(|(_, names)| names.iter().any(|n| starts_with_word(brand, n) || starts_with_word(name, n))))
+        .or_else(|| {
+            LOGOS.iter().find(|(_, names)| {
+                names
+                    .iter()
+                    .any(|n| starts_with_word(brand, n) || starts_with_word(name, n))
+            })
+        })
         .map(|(file, _)| format!("icons/brands/{file}.png"))
 }
 
 /// Letter shown when there is no logo.
 pub fn initial(brand: &str, name: &str) -> String {
     let s = if brand.trim().is_empty() { name } else { brand };
-    s.trim().chars().find(|c| c.is_alphanumeric()).map(|c| c.to_uppercase().collect()).unwrap_or_else(|| "?".into())
+    s.trim()
+        .chars()
+        .find(|c| c.is_alphanumeric())
+        .map(|c| c.to_uppercase().collect())
+        .unwrap_or_else(|| "?".into())
 }
 
 #[cfg(test)]
@@ -51,10 +65,22 @@ mod tests {
 
     #[test]
     fn matches() {
-        assert_eq!(logo("ARAL", "Aral Tankstelle").as_deref(), Some("icons/brands/aral.png"));
-        assert_eq!(logo("TOTAL", "").as_deref(), Some("icons/brands/totalenergies.png"));
-        assert_eq!(logo("", "Shell Dresden").as_deref(), Some("icons/brands/shell.png"));
-        assert_eq!(logo("AVIA Xpress", "").as_deref(), Some("icons/brands/avia.png"));
+        assert_eq!(
+            logo("ARAL", "Aral Tankstelle").as_deref(),
+            Some("icons/brands/aral.png")
+        );
+        assert_eq!(
+            logo("TOTAL", "").as_deref(),
+            Some("icons/brands/totalenergies.png")
+        );
+        assert_eq!(
+            logo("", "Shell Dresden").as_deref(),
+            Some("icons/brands/shell.png")
+        );
+        assert_eq!(
+            logo("AVIA Xpress", "").as_deref(),
+            Some("icons/brands/avia.png")
+        );
         assert_eq!(logo("OIL!", "").as_deref(), Some("icons/brands/oil.png"));
         assert_eq!(logo("Freie Tankstelle", "Jetzt tanken"), None);
         assert_eq!(logo("Raiffeisen", ""), None);

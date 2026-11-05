@@ -54,7 +54,11 @@ pub fn money_opt(lang: Lang, cur: &str, n: Option<f64>, dec: usize) -> String {
 /// Formats a number for an input field (no grouping).
 pub fn input_num(lang: Lang, n: f64, dec: usize) -> String {
     let s = format!("{:.*}", dec, n);
-    let s = if s.contains('.') { s.trim_end_matches('0').trim_end_matches('.').to_string() } else { s };
+    let s = if s.contains('.') {
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    } else {
+        s
+    };
     match lang {
         Lang::De => s.replace('.', ","),
         _ => s,
@@ -63,7 +67,10 @@ pub fn input_num(lang: Lang, n: f64, dec: usize) -> String {
 
 /// Parses user input, accepting both "1.234,5" and "1,234.5".
 pub fn parse_num(s: &str) -> Option<f64> {
-    let s: String = s.chars().filter(|c| !c.is_whitespace() && *c != '\'').collect();
+    let s: String = s
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '\'')
+        .collect();
     if s.is_empty() {
         return None;
     }
@@ -77,11 +84,17 @@ pub fn parse_num(s: &str) -> Option<f64> {
 }
 
 pub fn date(lang: Lang, s: &str, with_time: bool) -> String {
-    let Some(d) = parse_dt(s) else { return s.to_string() };
+    let Some(d) = parse_dt(s) else {
+        return s.to_string();
+    };
     let t = lang.t();
     let wd = t.weekdays[d.weekday().num_days_from_sunday() as usize];
     let mon = t.months[d.month0() as usize];
-    let time = if with_time { format!(" {:02}:{:02}", d.hour(), d.minute()) } else { String::new() };
+    let time = if with_time {
+        format!(" {:02}:{:02}", d.hour(), d.minute())
+    } else {
+        String::new()
+    };
     match lang {
         Lang::Zh => format!("{}年{}月{}日 {wd}{time}", d.year(), d.month(), d.day()),
         Lang::En => format!("{wd}, {mon} {}, {}{time}", d.day(), d.year()),
@@ -90,17 +103,26 @@ pub fn date(lang: Lang, s: &str, with_time: bool) -> String {
 }
 
 pub fn short_date(lang: Lang, s: &str) -> String {
-    let Some(d) = parse_dt(s) else { return s.to_string() };
+    let Some(d) = parse_dt(s) else {
+        return s.to_string();
+    };
     match lang {
         Lang::Zh => format!("{}/{}/{}", d.year() % 100, d.month(), d.day()),
-        Lang::En => format!("{} {}, {}", lang.t().months[d.month0() as usize], d.day(), d.year()),
+        Lang::En => format!(
+            "{} {}, {}",
+            lang.t().months[d.month0() as usize],
+            d.day(),
+            d.year()
+        ),
         Lang::De => format!("{:02}.{:02}.{}", d.day(), d.month(), d.year()),
     }
 }
 
 /// Compact date for chart axes.
 pub fn axis_date(lang: Lang, s: &str) -> String {
-    let Some(d) = parse_dt(s) else { return s.to_string() };
+    let Some(d) = parse_dt(s) else {
+        return s.to_string();
+    };
     let y = d.year() % 100;
     match lang {
         Lang::Zh => format!("{y}/{}/{}", d.month(), d.day()),
@@ -111,7 +133,9 @@ pub fn axis_date(lang: Lang, s: &str) -> String {
 
 /// "YYYY-MM" as a month heading.
 pub fn month(lang: Lang, key: &str) -> String {
-    let Some(d) = parse_dt(&format!("{key}-01")) else { return key.to_string() };
+    let Some(d) = parse_dt(&format!("{key}-01")) else {
+        return key.to_string();
+    };
     match lang {
         Lang::Zh => format!("{}年{}月", d.year(), d.month()),
         _ => format!("{} {}", lang.t().months[d.month0() as usize], d.year()),
@@ -120,12 +144,20 @@ pub fn month(lang: Lang, key: &str) -> String {
 
 /// "YYYY-MM" as a compact axis label.
 pub fn month_axis(lang: Lang, key: &str) -> String {
-    let Some(d) = parse_dt(&format!("{key}-01")) else { return key.to_string() };
+    let Some(d) = parse_dt(&format!("{key}-01")) else {
+        return key.to_string();
+    };
     let m = match lang {
         Lang::Zh => format!("{}月", d.month()),
-        _ => lang.t().months[d.month0() as usize].trim_end_matches('.').to_string(),
+        _ => lang.t().months[d.month0() as usize]
+            .trim_end_matches('.')
+            .to_string(),
     };
-    if d.month() == 1 { format!("{m} '{:02}", d.year() % 100) } else { m }
+    if d.month() == 1 {
+        format!("{m} '{:02}", d.year() % 100)
+    } else {
+        m
+    }
 }
 
 #[cfg(test)]
@@ -158,9 +190,18 @@ mod tests {
 
     #[test]
     fn dates() {
-        assert_eq!(date(Lang::Zh, "2026-10-14T18:30", true), "2026年10月14日 周三 18:30");
-        assert_eq!(date(Lang::En, "2026-10-14T18:30", false), "Wed, Oct 14, 2026");
-        assert_eq!(date(Lang::De, "2026-10-14T18:30", true), "Mi., 14. Okt. 2026 18:30");
+        assert_eq!(
+            date(Lang::Zh, "2026-10-14T18:30", true),
+            "2026年10月14日 周三 18:30"
+        );
+        assert_eq!(
+            date(Lang::En, "2026-10-14T18:30", false),
+            "Wed, Oct 14, 2026"
+        );
+        assert_eq!(
+            date(Lang::De, "2026-10-14T18:30", true),
+            "Mi., 14. Okt. 2026 18:30"
+        );
         assert_eq!(month(Lang::De, "2026-03"), "März 2026");
         assert_eq!(month_axis(Lang::En, "2026-01"), "Jan '26");
         assert_eq!(axis_date(Lang::De, "2026-03-05T10:00"), "5.3.26");

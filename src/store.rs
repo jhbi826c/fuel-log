@@ -53,7 +53,8 @@ impl Store {
     }
 
     pub fn vehicles(&self) -> Vec<Vehicle> {
-        self.data.with(|d| d.vehicles.iter().filter(|v| !v.deleted).cloned().collect())
+        self.data
+            .with(|d| d.vehicles.iter().filter(|v| !v.deleted).cloned().collect())
     }
 
     pub fn active_vehicle(&self) -> String {
@@ -98,10 +99,11 @@ impl Store {
         if rec.created_at == 0.0 {
             rec.created_at = now;
         }
-        self.data.update(|d| match d.records.iter_mut().find(|r| r.id == rec.id) {
-            Some(r) => *r = rec,
-            None => d.records.push(rec),
-        });
+        self.data
+            .update(|d| match d.records.iter_mut().find(|r| r.id == rec.id) {
+                Some(r) => *r = rec,
+                None => d.records.push(rec),
+            });
         self.commit();
     }
 
@@ -126,7 +128,13 @@ impl Store {
 
     pub fn add_vehicle(&self, name: &str) -> String {
         let id = web::new_id();
-        let v = Vehicle { id: id.clone(), name: name.to_string(), updated_at: web::now_ms(), deleted: false, fuels: Vec::new() };
+        let v = Vehicle {
+            id: id.clone(),
+            name: name.to_string(),
+            updated_at: web::now_ms(),
+            deleted: false,
+            fuels: Vec::new(),
+        };
         self.data.update(|d| d.vehicles.push(v));
         self.commit();
         id
@@ -163,7 +171,12 @@ impl Store {
     /// Fuel types a vehicle uses (empty means any).
     pub fn vehicle_fuels(&self, id: &str) -> Vec<String> {
         self.data
-            .with_untracked(|d| d.vehicles.iter().find(|v| v.id == id).map(|v| v.fuels.clone()))
+            .with_untracked(|d| {
+                d.vehicles
+                    .iter()
+                    .find(|v| v.id == id)
+                    .map(|v| v.fuels.clone())
+            })
             .unwrap_or_default()
     }
 
@@ -176,7 +189,11 @@ impl Store {
                 v.deleted = true;
                 v.updated_at = now;
             }
-            for r in d.records.iter_mut().filter(|r| r.vehicle_id == id && !r.deleted) {
+            for r in d
+                .records
+                .iter_mut()
+                .filter(|r| r.vehicle_id == id && !r.deleted)
+            {
                 r.deleted = true;
                 r.updated_at = now;
             }

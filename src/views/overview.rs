@@ -16,7 +16,11 @@ pub fn Overview() -> impl IntoView {
     let ui = expect_context::<Ui>();
     let entries = Memo::new(move |_| store.entries_for(&store.active_vehicle()));
     let years = Memo::new(move |_| {
-        let mut ys: Vec<i32> = entries.with(|e| e.iter().filter_map(|e| e.rec.date.get(..4)?.parse().ok()).collect());
+        let mut ys: Vec<i32> = entries.with(|e| {
+            e.iter()
+                .filter_map(|e| e.rec.date.get(..4)?.parse().ok())
+                .collect()
+        });
         ys.sort_unstable();
         ys.dedup();
         ys.reverse();
@@ -33,8 +37,17 @@ pub fn Overview() -> impl IntoView {
         if entries.with(Vec::is_empty) {
             return view! { <EmptyState /> }.into_any();
         }
-        let mut periods = vec![(Period::All, t.period_all.to_string()), (Period::Months(3), t.period_3m.to_string()), (Period::Months(12), t.period_12m.to_string())];
-        periods.extend(years.get().into_iter().map(|y| (Period::Year(y), y.to_string())));
+        let mut periods = vec![
+            (Period::All, t.period_all.to_string()),
+            (Period::Months(3), t.period_3m.to_string()),
+            (Period::Months(12), t.period_12m.to_string()),
+        ];
+        periods.extend(
+            years
+                .get()
+                .into_iter()
+                .map(|y| (Period::Year(y), y.to_string())),
+        );
         let is_custom = move || matches!(ui.period.get(), Period::Custom(..));
         view! {
             <div class="period-bar">
@@ -83,7 +96,10 @@ fn CustomRange() -> impl IntoView {
         Period::Custom(f, to) => (f, to),
         _ => (None, None),
     };
-    let fmt = |d: Option<NaiveDate>| d.map(|d| d.format("%Y-%m-%d").to_string()).unwrap_or_default();
+    let fmt = |d: Option<NaiveDate>| {
+        d.map(|d| d.format("%Y-%m-%d").to_string())
+            .unwrap_or_default()
+    };
     let parse = |s: String| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok();
     view! {
         <div class="card custom-range">
@@ -120,7 +136,11 @@ fn kpi(label: &'static str, value: String, sub: Option<String>) -> impl IntoView
 }
 
 fn group_name(name: &str, fallback: &'static str) -> String {
-    if name.is_empty() { fallback.to_string() } else { name.to_string() }
+    if name.is_empty() {
+        fallback.to_string()
+    } else {
+        name.to_string()
+    }
 }
 
 #[component]
@@ -131,44 +151,62 @@ fn StatsView(stats: Stats) -> impl IntoView {
     let cur = store.currency();
     let s = stats;
     if s.count == 0 {
-        return view! { <div class="card empty-period muted">{t.no_records_in_period}</div> }.into_any();
+        return view! { <div class="card empty-period muted">{t.no_records_in_period}</div> }
+            .into_any();
     }
     let m = |v: Option<f64>, d: usize| money_opt(l, &cur, v, d);
 
     let cons_sub = if s.avg_cons.is_some() {
-        fill(t.based_on_segments, &[("n", &s.seg_count), ("km", &num(l, s.seg_dist, 0))])
+        fill(
+            t.based_on_segments,
+            &[("n", &s.seg_count), ("km", &num(l, s.seg_dist, 0))],
+        )
     } else {
         t.need_two_full.to_string()
     };
 
     let mut kpis = vec![
-        kpi(t.total_spent, money(l, &cur, s.total_cost, 2), Some(fill(t.n_fillups, &[("n", &s.count)]))),
+        kpi(
+            t.total_spent,
+            money(l, &cur, s.total_cost, 2),
+            Some(fill(t.n_fillups, &[("n", &s.count)])),
+        ),
         kpi(
             t.total_fuel,
             format!("{} L", num(l, s.total_liters, 1)),
-            s.avg_liters_per_fill.map(|v| fill(t.per_fillup_liters, &[("v", &num(l, v, 1))])),
+            s.avg_liters_per_fill
+                .map(|v| fill(t.per_fillup_liters, &[("v", &num(l, v, 1))])),
         ),
         kpi(
             t.distance,
             format!("{} km", num(l, s.distance, 0)),
-            s.km_per_month.map(|v| fill(t.per_month_km, &[("v", &num(l, v, 0))])),
+            s.km_per_month
+                .map(|v| fill(t.per_month_km, &[("v", &num(l, v, 0))])),
         ),
         kpi(
             t.monthly_cost,
             m(s.cost_per_month, 2),
-            s.cost_per_month.map(|v| fill(t.per_year_money, &[("v", &money(l, &cur, v * 12.0, 0))])),
+            s.cost_per_month
+                .map(|v| fill(t.per_year_money, &[("v", &money(l, &cur, v * 12.0, 0))])),
         ),
         kpi(
             t.fill_interval,
-            s.avg_interval_days.map_or(format::DASH.into(), |d| fill(t.n_days, &[("n", &num(l, d, 1))])),
+            s.avg_interval_days.map_or(format::DASH.into(), |d| {
+                fill(t.n_days, &[("n", &num(l, d, 1))])
+            }),
             s.avg_interval_km.map(|v| format!("∅ {} km", num(l, v, 0))),
         ),
         kpi(t.per_fillup, m(s.avg_cost_per_fill, 2), None),
         kpi(
             t.last_consumption,
-            s.last_cons.map_or(format::DASH.into(), |v| format!("{} L/100 km", num(l, v, 2))),
+            s.last_cons.map_or(format::DASH.into(), |v| {
+                format!("{} L/100 km", num(l, v, 2))
+            }),
             s.best_cons.zip(s.worst_cons).map(|(b, w)| {
-                fill(t.best_worst, &[("best", &num(l, b, 1)), ("worst", &num(l, w, 1))])
+                fill(
+                    t.best_worst,
+                    &[("best", &num(l, b, 1)), ("worst", &num(l, w, 1))],
+                )
             }),
         ),
         kpi(
@@ -178,13 +216,26 @@ fn StatsView(stats: Stats) -> impl IntoView {
                 _ => format::DASH.into(),
             },
             s.min_price.as_ref().map(|p| {
-                let station = if p.station.is_empty() { String::new() } else { format!(" · {}", p.station) };
-                format!("{} {}{}", t.cheapest, format::short_date(l, &p.date), station)
+                let station = if p.station.is_empty() {
+                    String::new()
+                } else {
+                    format!(" · {}", p.station)
+                };
+                format!(
+                    "{} {}{}",
+                    t.cheapest,
+                    format::short_date(l, &p.date),
+                    station
+                )
             }),
         ),
     ];
     if s.savings > 0.0 {
-        kpis.push(kpi(t.savings, money(l, &cur, s.savings, 2), Some(t.savings_sub.to_string())));
+        kpis.push(kpi(
+            t.savings,
+            money(l, &cur, s.savings, 2),
+            Some(t.savings_sub.to_string()),
+        ));
     }
 
     let bars: Vec<Bar> = s
@@ -197,7 +248,11 @@ fn StatsView(stats: Stats) -> impl IntoView {
             tip_title: format::month(l, &mo.key),
             tip_lines: vec![
                 money(l, &cur, mo.cost, 2),
-                format!("{} L · {}", num(l, mo.liters, 1), fill(t.n_fillups, &[("n", &mo.count)])),
+                format!(
+                    "{} L · {}",
+                    num(l, mo.liters, 1),
+                    fill(t.n_fillups, &[("n", &mo.count)])
+                ),
             ],
         })
         .collect();
@@ -242,7 +297,10 @@ fn StatsView(stats: Stats) -> impl IntoView {
         }
     });
 
-    let group_table = |title: &'static str, first_col: &'static str, rows: &[crate::stats::GroupAgg], fallback: &'static str| {
+    let group_table = |title: &'static str,
+                       first_col: &'static str,
+                       rows: &[crate::stats::GroupAgg],
+                       fallback: &'static str| {
         view! {
             <section class="card half">
                 <h3>{title}</h3>

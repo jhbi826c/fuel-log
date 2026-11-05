@@ -83,7 +83,11 @@ impl TkStation {
             lat: self.lat,
             lng: self.lng,
             dist_km: self.dist_km,
-            fuels: TkFuel::ALL.into_iter().filter(|f| self.price(*f).is_some()).map(TkFuel::name).collect(),
+            fuels: TkFuel::ALL
+                .into_iter()
+                .filter(|f| self.price(*f).is_some())
+                .map(TkFuel::name)
+                .collect(),
             fuel_tagged: true,
             ..Default::default()
         }
@@ -100,16 +104,25 @@ pub enum TkError {
 /// Whether `s` looks like a Tankerkönig key (a UUID).
 pub fn is_valid_key(s: &str) -> bool {
     let groups: Vec<&str> = s.split('-').collect();
-    groups.iter().map(|g| g.len()).eq([8, 4, 4, 4, 12]) && groups.iter().all(|g| g.chars().all(|c| c.is_ascii_hexdigit()))
+    groups.iter().map(|g| g.len()).eq([8, 4, 4, 4, 12])
+        && groups
+            .iter()
+            .all(|g| g.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 /// Last four characters of a key, for display.
 pub fn key_hint(key: &str) -> String {
-    format!("••••{}", key.get(key.len().saturating_sub(4)..).unwrap_or_default())
+    format!(
+        "••••{}",
+        key.get(key.len().saturating_sub(4)..).unwrap_or_default()
+    )
 }
 
 pub fn list_url(key: &str, (lat, lng): (f64, f64), radius_km: u32) -> String {
-    format!("{LIST_URL}?lat={lat:.5}&lng={lng:.5}&rad={}&sort=dist&type=all&apikey={key}", radius_km.clamp(1, 25))
+    format!(
+        "{LIST_URL}?lat={lat:.5}&lng={lng:.5}&rad={}&sort=dist&type=all&apikey={key}",
+        radius_km.clamp(1, 25)
+    )
 }
 
 fn price(v: &Value) -> Option<f64> {
@@ -120,9 +133,15 @@ pub fn parse_list(v: &Value) -> Result<Vec<TkStation>, TkError> {
     if v["ok"].as_bool() != Some(true) {
         let msg = text(v, "message");
         let lower = msg.to_lowercase();
-        return Err(if lower.contains("key") || lower.contains("apikey") { TkError::InvalidKey } else { TkError::Api(msg) });
+        return Err(if lower.contains("key") || lower.contains("apikey") {
+            TkError::InvalidKey
+        } else {
+            TkError::Api(msg)
+        });
     }
-    let list = v["stations"].as_array().ok_or_else(|| TkError::Api("no stations".into()))?;
+    let list = v["stations"]
+        .as_array()
+        .ok_or_else(|| TkError::Api("no stations".into()))?;
     Ok(list
         .iter()
         .filter_map(|s| {
@@ -131,7 +150,12 @@ pub fn parse_list(v: &Value) -> Result<Vec<TkStation>, TkError> {
                 id: text(s, "id"),
                 name: text(s, "name"),
                 brand: text(s, "brand"),
-                address: join_address(&street, &text(s, "houseNumber"), &text(s, "postCode"), &text(s, "place")),
+                address: join_address(
+                    &street,
+                    &text(s, "houseNumber"),
+                    &text(s, "postCode"),
+                    &text(s, "place"),
+                ),
                 street,
                 lat: num(&s["lat"])?,
                 lng: num(&s["lng"])?,
@@ -152,10 +176,18 @@ thread_local! {
 }
 
 /// Stations around a position with their current prices.
-pub async fn stations(key: &str, origin: (f64, f64), radius_km: u32) -> Result<Vec<TkStation>, TkError> {
+pub async fn stations(
+    key: &str,
+    origin: (f64, f64),
+    radius_km: u32,
+) -> Result<Vec<TkStation>, TkError> {
     let cache_key = format!("{:.3},{:.3},{radius_km}", origin.0, origin.1);
     let now = crate::web::now_ms();
-    let hit = CACHE.with_borrow(|c| c.iter().find(|(k, t, _)| *k == cache_key && now - t < CACHE_MS).map(|e| e.2.clone()));
+    let hit = CACHE.with_borrow(|c| {
+        c.iter()
+            .find(|(k, t, _)| *k == cache_key && now - t < CACHE_MS)
+            .map(|e| e.2.clone())
+    });
     if let Some(list) = hit {
         return Ok(list);
     }
@@ -205,7 +237,10 @@ mod tests {
         assert_eq!((s.e5, s.e10, s.diesel), (Some(1.809), None, Some(1.659)));
         assert!(!s.is_open);
         assert_eq!(s.to_station().fuels, ["Diesel", "Super E5"]);
-        assert_eq!(s.to_station().label(), "TotalEnergies Margarete-Sommer-Str.");
+        assert_eq!(
+            s.to_station().label(),
+            "TotalEnergies Margarete-Sommer-Str."
+        );
     }
 
     #[test]
@@ -213,14 +248,20 @@ mod tests {
         let bad = json!({"status": "error", "ok": false, "message": "Key existiert nicht oder ist deaktiviert"});
         assert_eq!(parse_list(&bad), Err(TkError::InvalidKey));
         let other = json!({"ok": false, "message": "Radius zu groß"});
-        assert_eq!(parse_list(&other), Err(TkError::Api("Radius zu groß".into())));
+        assert_eq!(
+            parse_list(&other),
+            Err(TkError::Api("Radius zu groß".into()))
+        );
     }
 
     #[test]
     fn url_and_fuel() {
         let u = list_url("k", (52.521, 13.438), 40);
         assert!(u.contains("rad=25") && u.contains("lat=52.52100") && u.ends_with("apikey=k"));
-        assert_eq!(TkFuel::for_vehicle(&["Premium Diesel".into()]), TkFuel::Diesel);
+        assert_eq!(
+            TkFuel::for_vehicle(&["Premium Diesel".into()]),
+            TkFuel::Diesel
+        );
         assert_eq!(TkFuel::for_vehicle(&["Super E5".into()]), TkFuel::E5);
         assert_eq!(TkFuel::for_vehicle(&[]), TkFuel::Diesel);
         assert_eq!(TkFuel::for_vehicle(&["LPG".into()]), TkFuel::Diesel);

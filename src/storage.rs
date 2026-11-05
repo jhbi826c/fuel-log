@@ -17,7 +17,10 @@ pub fn load<T: DeserializeOwned>(key: &str) -> Option<T> {
     match serde_json::from_str(&raw) {
         Ok(v) => Some(v),
         Err(_) => {
-            let _ = s.set_item(&format!("{key}.corrupt-{}", js_sys::Date::now() as u64), &raw);
+            let _ = s.set_item(
+                &format!("{key}.corrupt-{}", js_sys::Date::now() as u64),
+                &raw,
+            );
             None
         }
     }
