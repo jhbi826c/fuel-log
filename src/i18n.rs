@@ -23,7 +23,10 @@ impl Lang {
     }
 
     pub fn from_code(code: &str) -> Self {
-        Self::ALL.into_iter().find(|l| l.code() == code).unwrap_or_default()
+        Self::ALL
+            .into_iter()
+            .find(|l| l.code() == code)
+            .unwrap_or_default()
     }
 
     pub fn native_name(self) -> &'static str {
@@ -153,6 +156,8 @@ pub struct Texts {
     pub record_not_found: &'static str,
     pub new_fillup: &'static str,
     pub edit_fillup: &'static str,
+    pub from_can: &'static str,
+    pub from_can_hint: &'static str,
     pub date: &'static str,
     pub odometer: &'static str,
     pub trip: &'static str,
@@ -382,6 +387,8 @@ pub const EN: Texts = Texts {
     record_not_found: "This fill-up does not exist (anymore).",
     new_fillup: "New fill-up",
     edit_fillup: "Edit fill-up",
+    from_can: "From a fuel can at home",
+    from_can_hint: "Amounts are optional. You can enter the purchase cost of this fuel; the liters still count towards consumption.",
     date: "Date & time",
     odometer: "Odometer",
     trip: "Distance since last fill-up",
@@ -516,7 +523,9 @@ pub const EN: Texts = Texts {
     unnamed_station: "Fuel station",
 
     weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-    months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    months: [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ],
 };
 
 pub const ZH: Texts = Texts {
@@ -611,6 +620,8 @@ pub const ZH: Texts = Texts {
     record_not_found: "该记录不存在（或已被删除）。",
     new_fillup: "新增加油记录",
     edit_fillup: "编辑加油记录",
+    from_can: "在家用油桶加油",
+    from_can_hint: "金额可留空，也可填写这部分油的购入成本；加油量仍会计入油耗。",
     date: "日期时间",
     odometer: "里程表读数",
     trip: "距上次加油行驶",
@@ -745,7 +756,9 @@ pub const ZH: Texts = Texts {
     unnamed_station: "加油站",
 
     weekdays: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
-    months: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+    months: [
+        "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月",
+    ],
 };
 
 pub const DE: Texts = Texts {
@@ -840,6 +853,8 @@ pub const DE: Texts = Texts {
     record_not_found: "Dieser Tankvorgang existiert nicht (mehr).",
     new_fillup: "Neuer Tankvorgang",
     edit_fillup: "Tankvorgang bearbeiten",
+    from_can: "Zu Hause aus dem Kanister getankt",
+    from_can_hint: "Preis und Betrag sind optional. Du kannst die Anschaffungskosten dieser Kraftstoffmenge eintragen; die Liter zählen weiterhin zum Verbrauch.",
     date: "Datum & Uhrzeit",
     odometer: "Kilometerstand",
     trip: "Strecke seit letztem Tanken",
@@ -974,7 +989,10 @@ pub const DE: Texts = Texts {
     unnamed_station: "Tankstelle",
 
     weekdays: ["So.", "Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa."],
-    months: ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez."],
+    months: [
+        "Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.",
+        "Dez.",
+    ],
 };
 
 #[cfg(test)]
@@ -983,7 +1001,10 @@ mod tests {
 
     #[test]
     fn fill_replaces_placeholders() {
-        assert_eq!(fill("{n} of {m}, {n}", &[("n", &3), ("m", &"x")]), "3 of x, 3");
+        assert_eq!(
+            fill("{n} of {m}, {n}", &[("n", &3), ("m", &"x")]),
+            "3 of x, 3"
+        );
     }
 
     #[test]
@@ -1017,7 +1038,12 @@ mod tests {
             |t| t.stations_found,
         ];
         let holes = |s: &str| {
-            let mut v: Vec<String> = s.split('{').skip(1).filter_map(|p| p.split_once('}')).map(|p| p.0.to_string()).collect();
+            let mut v: Vec<String> = s
+                .split('{')
+                .skip(1)
+                .filter_map(|p| p.split_once('}'))
+                .map(|p| p.0.to_string())
+                .collect();
             v.sort();
             v
         };

@@ -41,6 +41,9 @@ pub struct Record {
     /// A fill-up before this one was not recorded.
     #[serde(default, skip_serializing_if = "is_false")]
     pub missed_previous: bool,
+    /// Fuel transferred from a can at home rather than filled at a station.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub from_can: bool,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub fuel: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -77,6 +80,7 @@ impl Default for Record {
             paid: None,
             full: true,
             missed_previous: false,
+            from_can: false,
             fuel: String::new(),
             station: String::new(),
             address: String::new(),
@@ -94,22 +98,32 @@ impl Default for Record {
 impl Record {
     /// Money spent on this fill-up.
     pub fn cost(&self) -> f64 {
+        self.known_cost().unwrap_or(0.0)
+    }
+
+    /// Recorded cost, if known; an empty amount is different from zero.
+    pub fn known_cost(&self) -> Option<f64> {
         self.paid
             .or(self.total)
             .or(match (self.liters, self.price) {
                 (Some(l), Some(p)) => Some(l * p),
                 _ => None,
             })
-            .unwrap_or(0.0)
     }
 
     pub fn coords(&self) -> Option<(f64, f64)> {
+        if self.from_can {
+            return None;
+        }
         Some((self.lat?, self.lng?))
     }
 
     /// Whether the record is usable (tombstones are always kept).
     pub fn is_valid(&self) -> bool {
-        self.deleted || (!self.id.is_empty() && self.date.len() >= 10 && (self.odometer.is_some() || self.trip.is_some()))
+        self.deleted
+            || (!self.id.is_empty()
+                && self.date.len() >= 10
+                && (self.odometer.is_some() || self.trip.is_some()))
     }
 }
 
@@ -186,7 +200,8 @@ impl AppData {
     /// Merges another data set into this one; returns the number of changed items.
     pub fn merge(&mut self, other: &AppData) -> usize {
         let other = other.clone().normalized();
-        merge_list(&mut self.records, &other.records) + merge_list(&mut self.vehicles, &other.vehicles)
+        merge_list(&mut self.records, &other.records)
+            + merge_list(&mut self.vehicles, &other.vehicles)
     }
 
     /// Drops invalid entries and sorts by id.
@@ -236,7 +251,10 @@ impl MapProvider {
 
     /// Unknown keys (e.g. removed providers) fall back to the default.
     pub fn from_key(k: &str) -> Self {
-        Self::ALL.into_iter().find(|p| p.key() == k).unwrap_or_default()
+        Self::ALL
+            .into_iter()
+            .find(|p| p.key() == k)
+            .unwrap_or_default()
     }
 
     pub fn name(self) -> &'static str {
@@ -253,7 +271,9 @@ impl MapProvider {
         match self {
             Self::Google => format!("https://www.google.com/maps/search/?api=1&query={lat},{lng}"),
             Self::Apple => format!("https://maps.apple.com/?ll={lat},{lng}&q={}", enc(label)),
-            Self::Osm => format!("https://www.openstreetmap.org/?mlat={lat}&mlon={lng}#map=17/{lat}/{lng}"),
+            Self::Osm => {
+                format!("https://www.openstreetmap.org/?mlat={lat}&mlon={lng}#map=17/{lat}/{lng}")
+            }
             Self::OsmAnd => format!("https://osmand.net/map/?pin={lat},{lng}#17/{lat}/{lng}"),
         }
     }
@@ -261,7 +281,9 @@ impl MapProvider {
     /// Link that starts navigation to a point where the provider supports it.
     pub fn route_url(self, lat: f64, lng: f64, label: &str) -> String {
         match self {
-            Self::Google => format!("https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"),
+            Self::Google => {
+                format!("https://www.google.com/maps/dir/?api=1&destination={lat},{lng}")
+            }
             Self::Apple => format!("https://maps.apple.com/?daddr={lat},{lng}&q={}", enc(label)),
             Self::Osm => format!("https://www.openstreetmap.org/directions?to={lat},{lng}"),
             Self::OsmAnd => self.point_url(lat, lng, label),
@@ -270,7 +292,14 @@ impl MapProvider {
 
     /// Map link for a record's location or, failing that, its station name/address.
     pub fn url(self, r: &Record) -> Option<String> {
-        let label = if r.station.is_empty() { "Fuel" } else { r.station.as_str() };
+        if r.from_can {
+            return None;
+        }
+        let label = if r.station.is_empty() {
+            "Fuel"
+        } else {
+            r.station.as_str()
+        };
         if let Some((lat, lng)) = r.coords() {
             return Some(self.point_url(lat, lng, label));
         }
@@ -297,7 +326,9 @@ pub fn enc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{b:02X}")),
         }
     }
@@ -366,7 +397,10 @@ impl Theme {
     }
 
     pub fn from_key(k: &str) -> Self {
-        Self::ALL.into_iter().find(|t| t.key() == k).unwrap_or_default()
+        Self::ALL
+            .into_iter()
+            .find(|t| t.key() == k)
+            .unwrap_or_default()
     }
 }
 
@@ -410,7 +444,11 @@ mod tests {
 
     #[test]
     fn cost_prefers_paid_then_total_then_product() {
-        let mut r = Record { liters: Some(10.0), price: Some(2.0), ..Default::default() };
+        let mut r = Record {
+            liters: Some(10.0),
+            price: Some(2.0),
+            ..Default::default()
+        };
         assert_eq!(r.cost(), 20.0);
         r.total = Some(19.9);
         assert_eq!(r.cost(), 19.9);
@@ -420,18 +458,32 @@ mod tests {
 
     #[test]
     fn deserialize_defaults_full_to_true() {
-        let r: Record = serde_json::from_str(r#"{"id":"a","date":"2026-01-01T10:00","odometer":5}"#).unwrap();
+        let r: Record =
+            serde_json::from_str(r#"{"id":"a","date":"2026-01-01T10:00","odometer":5}"#).unwrap();
         assert!(r.is_valid());
-        let t: Record = serde_json::from_str(r#"{"id":"t","date":"2026-01-01T10:00","trip":480}"#).unwrap();
+        let t: Record =
+            serde_json::from_str(r#"{"id":"t","date":"2026-01-01T10:00","trip":480}"#).unwrap();
         assert!(t.is_valid() && t.trip == Some(480.0));
-        assert!(!Record { id: "x".into(), date: "2026-01-01T10:00".into(), ..Default::default() }.is_valid());
+        assert!(
+            !Record {
+                id: "x".into(),
+                date: "2026-01-01T10:00".into(),
+                ..Default::default()
+            }
+            .is_valid()
+        );
         assert!(r.full);
         assert!(!r.missed_previous);
     }
 
     #[test]
     fn roundtrip_skips_empty_fields() {
-        let r = Record { id: "x".into(), date: "2026-01-01T10:00".into(), odometer: Some(1.0), ..Default::default() };
+        let r = Record {
+            id: "x".into(),
+            date: "2026-01-01T10:00".into(),
+            odometer: Some(1.0),
+            ..Default::default()
+        };
         let s = serde_json::to_string(&r).unwrap();
         assert!(!s.contains("station"));
         assert_eq!(serde_json::from_str::<Record>(&s).unwrap(), r);
@@ -447,33 +499,64 @@ mod tests {
             updated_at: t,
             ..Default::default()
         };
-        let mut local = AppData { version: 1, vehicles: vec![], records: vec![r("a", 1.0, "old"), r("b", 5.0, "keep")] };
+        let mut local = AppData {
+            version: 1,
+            vehicles: vec![],
+            records: vec![r("a", 1.0, "old"), r("b", 5.0, "keep")],
+        };
         let mut deleted = r("b", 4.0, "x");
         deleted.deleted = true;
         let remote = AppData {
             version: 1,
-            vehicles: vec![Vehicle { id: "v".into(), name: "Car".into(), updated_at: 1.0, deleted: false, fuels: Vec::new() }],
-            records: vec![r("a", 2.0, "new"), deleted, r("c", 1.0, "added"), Record::default()],
+            vehicles: vec![Vehicle {
+                id: "v".into(),
+                name: "Car".into(),
+                updated_at: 1.0,
+                deleted: false,
+                fuels: Vec::new(),
+            }],
+            records: vec![
+                r("a", 2.0, "new"),
+                deleted,
+                r("c", 1.0, "added"),
+                Record::default(),
+            ],
         };
         assert_eq!(local.merge(&remote), 3);
         let local = local.normalized();
-        assert_eq!(local.records.iter().map(|r| r.station.as_str()).collect::<Vec<_>>(), ["new", "keep", "added"]);
+        assert_eq!(
+            local
+                .records
+                .iter()
+                .map(|r| r.station.as_str())
+                .collect::<Vec<_>>(),
+            ["new", "keep", "added"]
+        );
         assert_eq!(local.vehicles.len(), 1);
 
         let mut newer_delete = r("b", 9.0, "x");
         newer_delete.deleted = true;
         let mut l2 = local.clone();
-        l2.merge(&AppData { records: vec![newer_delete], ..Default::default() });
+        l2.merge(&AppData {
+            records: vec![newer_delete],
+            ..Default::default()
+        });
         assert!(l2.records.iter().find(|r| r.id == "b").unwrap().deleted);
     }
 
     #[test]
     fn removed_map_provider_falls_back() {
-        let s: Settings =
-            serde_json::from_str(r#"{"mapProvider":"amap","currency":"Kč","tankerkoenigKey":"x","cardMarkup":1.5}"#).unwrap();
+        let s: Settings = serde_json::from_str(
+            r#"{"mapProvider":"amap","currency":"Kč","tankerkoenigKey":"x","cardMarkup":1.5}"#,
+        )
+        .unwrap();
         assert_eq!(s.map_provider, MapProvider::Google);
         assert_eq!(s.currency, "Kč");
-        assert!(serde_json::to_string(&s).unwrap().contains(r#""mapProvider":"google""#));
+        assert!(
+            serde_json::to_string(&s)
+                .unwrap()
+                .contains(r#""mapProvider":"google""#)
+        );
         assert_eq!(s.theme, Theme::Auto);
         let dark: Settings = serde_json::from_str(r#"{"theme":"dark"}"#).unwrap();
         assert_eq!(dark.theme, Theme::Dark);
@@ -482,15 +565,24 @@ mod tests {
     #[test]
     fn compatible_fuels_are_usable() {
         let v = |f: &[&str]| f.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        assert_eq!(usable_fuels(&v(&["Super E10"])), ["Super E10", "Super E5", "Super Plus", "Super 100"]);
+        assert_eq!(
+            usable_fuels(&v(&["Super E10"])),
+            ["Super E10", "Super E5", "Super Plus", "Super 100"]
+        );
         assert_eq!(usable_fuels(&v(&["Diesel"])), ["Diesel", "Premium Diesel"]);
-        assert_eq!(usable_fuels(&v(&["LPG", "Super E5"])), ["Super E5", "Super Plus", "Super 100", "LPG"]);
+        assert_eq!(
+            usable_fuels(&v(&["LPG", "Super E5"])),
+            ["Super E5", "Super Plus", "Super 100", "LPG"]
+        );
         assert!(usable_fuels(&v(&["AdBlue"])).is_empty());
     }
 
     #[test]
     fn map_url_encodes() {
-        let r = Record { station: "Aral Straße".into(), ..Default::default() };
+        let r = Record {
+            station: "Aral Straße".into(),
+            ..Default::default()
+        };
         assert_eq!(
             MapProvider::Google.url(&r).unwrap(),
             "https://www.google.com/maps/search/?api=1&query=Aral%20Stra%C3%9Fe"

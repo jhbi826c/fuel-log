@@ -9,8 +9,15 @@ use crate::stats::{Entry, SegState};
 use crate::store::Store;
 use crate::web;
 
-fn matches(e: &Entry, q: &str) -> bool {
-    [&e.rec.station, &e.rec.address, &e.rec.fuel, &e.rec.notes, &e.rec.date]
+fn matches(e: &Entry, q: &str, t: &Texts) -> bool {
+    (e.rec.from_can && t.from_can.to_lowercase().contains(q))
+        || [
+            &e.rec.station,
+            &e.rec.address,
+            &e.rec.fuel,
+            &e.rec.notes,
+            &e.rec.date,
+        ]
         .iter()
         .any(|s| s.to_lowercase().contains(q))
 }
@@ -34,7 +41,7 @@ pub fn Records() -> impl IntoView {
             .get()
             .into_iter()
             .rev()
-            .filter(|e| q.is_empty() || matches(e, &q))
+            .filter(|e| q.is_empty() || matches(e, &q, t))
             .collect();
         if items.is_empty() {
             return view! { <p class="card muted">{t.no_matches}</p> }.into_any();
@@ -92,7 +99,13 @@ pub fn Records() -> impl IntoView {
     }
 }
 
-fn record_card(e: Entry, t: &'static Texts, l: Lang, cur: &str, provider: MapProvider) -> impl IntoView {
+fn record_card(
+    e: Entry,
+    t: &'static Texts,
+    l: Lang,
+    cur: &str,
+    provider: MapProvider,
+) -> impl IntoView {
     let r = &e.rec;
     let href = format!("#/edit/{}", r.id);
     let (cons_class, cons_text) = match (e.state, &e.seg) {
@@ -103,7 +116,17 @@ fn record_card(e: Entry, t: &'static Texts, l: Lang, cur: &str, provider: MapPro
         _ => ("cons warn", t.state_invalid.to_string()),
     };
     let price = r.price.or(e.unit_price);
-    let station = if r.station.is_empty() { t.unspecified.to_string() } else { r.station.clone() };
+    let station = if r.from_can {
+        t.from_can.to_string()
+    } else if r.station.is_empty() {
+        t.unspecified.to_string()
+    } else {
+        r.station.clone()
+    };
+    let cost = r
+        .known_cost()
+        .map(|v| money(l, cur, v, 2))
+        .unwrap_or_else(|| "—".to_string());
     let saved = match (r.total, r.paid) {
         (Some(total), Some(paid)) if total > paid => Some(money(l, cur, total - paid, 2)),
         _ => None,
@@ -127,7 +150,7 @@ fn record_card(e: Entry, t: &'static Texts, l: Lang, cur: &str, provider: MapPro
         >
             <div class="rec-row">
                 <span class="rec-date">{format::date(l, &r.date, true)}</span>
-                <span class="rec-cost">{money(l, cur, e.cost, 2)}</span>
+                <span class="rec-cost">{cost}</span>
             </div>
             <div class="rec-row">
                 <span class="rec-station">
@@ -135,7 +158,8 @@ fn record_card(e: Entry, t: &'static Texts, l: Lang, cur: &str, provider: MapPro
                     {(!r.fuel.is_empty()).then(|| view! { <span class="badge">{r.fuel.clone()}</span> })}
                 </span>
                 <span class="muted nowrap">
-                    {r.liters.map(|v| num(l, v, 2))}" L × "{price.map(|p| money(l, cur, p, 3))}
+                    {r.liters.map(|v| num(l, v, 2))}" L"
+                    {price.map(|p| format!(" × {}", money(l, cur, p, 3)))}
                 </span>
             </div>
             <div class="rec-row">

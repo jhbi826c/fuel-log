@@ -8,6 +8,7 @@ UI languages: English, 中文, Deutsch.
 
 - **Fill-ups**: date and time, odometer and/or distance since the last fill-up (either is enough), liters, price per liter, total (enter any two, the third is calculated), amount actually paid (discounts), full or partial tank, missed fill-ups, fuel type, station, address with GPS location and notes.
 - **Consumption**: calculated full-to-full from odometer readings or entered distances. Partial fill-ups are added to the next full tank, and a missed fill-up starts a new measurement; a full tank with an entered distance counts even as the first record.
+- **Fuel cans at home**: mark a fill-up as coming from a can. Station and location fields are hidden, amounts are optional, and the fuel still counts towards consumption. These records are excluded from station statistics; unknown prices are excluded from the price trend and average price.
 - **Statistics** (all time, 3 or 12 months, or per year):
   - Average consumption, average price, cost per 100 km.
   - Total spent, liters and distance; monthly and yearly cost.

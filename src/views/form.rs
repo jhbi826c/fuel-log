@@ -48,7 +48,13 @@ fn with_own_names(mut list: Vec<Station>, all: &[Record]) -> Vec<Station> {
         .iter()
         .filter_map(|r| {
             let (lat, lng) = r.coords()?;
-            Some(places::Known { lat, lng, name: &r.station, address: &r.address, date: &r.date })
+            Some(places::Known {
+                lat,
+                lng,
+                name: &r.station,
+                address: &r.address,
+                date: &r.date,
+            })
         })
         .collect();
     places::apply_own_names(&mut list, &known);
@@ -75,11 +81,21 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         .into_any();
     }
     let editing = existing.is_some();
-    let all = store.data.with_untracked(|d| d.records.iter().filter(|r| !r.deleted).cloned().collect::<Vec<_>>());
+    let all = store.data.with_untracked(|d| {
+        d.records
+            .iter()
+            .filter(|r| !r.deleted)
+            .cloned()
+            .collect::<Vec<_>>()
+    });
     let history = StoredValue::new(all.clone());
     let active = store.active_vehicle();
     let last_of_vehicle = {
-        let mut rs: Vec<Record> = all.iter().filter(|r| r.vehicle_id == active).cloned().collect();
+        let mut rs: Vec<Record> = all
+            .iter()
+            .filter(|r| r.vehicle_id == active)
+            .cloned()
+            .collect();
         sort_records(&mut rs);
         rs.pop()
     };
@@ -111,12 +127,17 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     let paid = RwSignal::new(s(base.paid, 2));
     let full = RwSignal::new(base.full);
     let missed = RwSignal::new(base.missed_previous);
+    let from_can = RwSignal::new(base.from_can);
     let fuel = RwSignal::new(base.fuel.clone());
     let station = RwSignal::new(base.station.clone());
     let address = RwSignal::new(base.address.clone());
     let coords = RwSignal::new(base.coords());
     let notes = RwSignal::new(base.notes.clone());
-    let order = RwSignal::new(if editing { vec![Trio::Total, Trio::Liters, Trio::Price] } else { Vec::new() });
+    let order = RwSignal::new(if editing {
+        vec![Trio::Total, Trio::Liters, Trio::Price]
+    } else {
+        Vec::new()
+    });
     let computed = RwSignal::new(None::<Trio>);
     let locating = RwSignal::new(false);
     let searching = RwSignal::new(false);
@@ -169,7 +190,11 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         });
         let o = order.get_untracked();
         let target = (o.len() >= 2)
-            .then(|| [Trio::Liters, Trio::Price, Trio::Total].into_iter().find(|x| !o[o.len() - 2..].contains(x)))
+            .then(|| {
+                [Trio::Liters, Trio::Price, Trio::Total]
+                    .into_iter()
+                    .find(|x| !o[o.len() - 2..].contains(x))
+            })
             .flatten();
         let (lv, pv, tv) = (
             parse_num(&liters.get_untracked()),
@@ -177,9 +202,15 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             parse_num(&total.get_untracked()),
         );
         let result = match target {
-            Some(Trio::Liters) => tv.zip(pv.filter(|p| *p > 0.0)).map(|(t, p)| (Trio::Liters, input_num(l, t / p, 2))),
-            Some(Trio::Price) => tv.zip(lv.filter(|v| *v > 0.0)).map(|(t, v)| (Trio::Price, input_num(l, t / v, 3))),
-            Some(Trio::Total) => lv.zip(pv).map(|(v, p)| (Trio::Total, input_num(l, v * p, 2))),
+            Some(Trio::Liters) => tv
+                .zip(pv.filter(|p| *p > 0.0))
+                .map(|(t, p)| (Trio::Liters, input_num(l, t / p, 2))),
+            Some(Trio::Price) => tv
+                .zip(lv.filter(|v| *v > 0.0))
+                .map(|(t, v)| (Trio::Price, input_num(l, t / v, 3))),
+            Some(Trio::Total) => lv
+                .zip(pv)
+                .map(|(v, p)| (Trio::Total, input_num(l, v * p, 2))),
             None => None,
         };
         computed.set(result.as_ref().map(|(f, _)| *f));
@@ -199,13 +230,18 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 vehicle_id: vehicle.get(),
                 date: date.get(),
                 odometer: parse_num(&odo.get()),
-                trip: if trip_explicit.get() { parse_num(&trip.get()) } else { None },
+                trip: if trip_explicit.get() {
+                    parse_num(&trip.get())
+                } else {
+                    None
+                },
                 liters: Some(parse_num(&liters.get())?),
                 price: parse_num(&price.get()),
                 total: parse_num(&total.get()),
                 paid: parse_num(&paid.get()),
                 full: full.get(),
                 missed_previous: missed.get(),
+                from_can: from_can.get(),
                 ..Default::default()
             };
             if cand.odometer.is_none() && cand.trip.is_none() {
@@ -218,12 +254,24 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
     };
 
     let suggestions = |f: fn(&Record) -> &str| by_frequency(all.iter().map(f));
-    let stations = suggestions(|r| r.station.as_str());
-    let history_fuels: Vec<String> = suggestions(|r| r.fuel.as_str()).into_iter().filter(|f| !is_known_fuel(f)).take(4).collect();
+    let stations = by_frequency(
+        all.iter()
+            .filter(|r| !r.from_can)
+            .map(|r| r.station.as_str()),
+    );
+    let history_fuels: Vec<String> = suggestions(|r| r.fuel.as_str())
+        .into_iter()
+        .filter(|f| !is_known_fuel(f))
+        .take(4)
+        .collect();
     let base_fuel = base.fuel.clone();
     let fuel_options = Memo::new(move |_| {
         let mine = store.data.with(|d| {
-            d.vehicles.iter().find(|v| v.id == vehicle.get()).map(|v| v.fuels.clone()).unwrap_or_default()
+            d.vehicles
+                .iter()
+                .find(|v| v.id == vehicle.get())
+                .map(|v| v.fuels.clone())
+                .unwrap_or_default()
         });
         let usable = usable_fuels(&mine);
         let mut opts: Vec<String> = FUEL_TYPES
@@ -231,10 +279,17 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             .map(|(name, _)| name.to_string())
             .filter(|n| mine.is_empty() || usable.contains(&n.as_str()) || *n == base_fuel)
             .collect();
-        opts.extend(history_fuels.iter().filter(|f| !opts.contains(f)).cloned().collect::<Vec<_>>());
+        opts.extend(
+            history_fuels
+                .iter()
+                .filter(|f| !opts.contains(f))
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
         opts
     });
-    let custom_fuel = RwSignal::new(!base.fuel.is_empty() && !fuel_options.get_untracked().contains(&base.fuel));
+    let custom_fuel =
+        RwSignal::new(!base.fuel.is_empty() && !fuel_options.get_untracked().contains(&base.fuel));
     let station_fuels = RwSignal::new(Vec::<&'static str>::new());
 
     let on_station_change = {
@@ -242,7 +297,9 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         move |name: String| {
             let latest = all
                 .iter()
-                .filter(|r| r.station.trim() == name.trim() && !name.trim().is_empty())
+                .filter(|r| {
+                    !r.from_can && r.station.trim() == name.trim() && !name.trim().is_empty()
+                })
                 .max_by(|a, b| a.date.cmp(&b.date));
             if let Some(r) = latest {
                 if address.get_untracked().is_empty() {
@@ -259,7 +316,11 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
 
     let apply_station = move |st: &Station| {
         let label = st.label();
-        station.set(if label.is_empty() { store.t().unnamed_station.to_string() } else { label });
+        station.set(if label.is_empty() {
+            store.t().unnamed_station.to_string()
+        } else {
+            label
+        });
         if !st.address.is_empty() {
             address.set(st.address.clone());
         }
@@ -280,7 +341,10 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         apply_station(&p.station);
         fuel.set(p.fuel.to_string());
         custom_fuel.set(!fuel_options.get_untracked().iter().any(|f| f == p.fuel));
-        if let Some(v) = p.price.filter(|_| store.settings.with_untracked(|s| s.currency == "€")) {
+        if let Some(v) = p
+            .price
+            .filter(|_| store.settings.with_untracked(|s| s.currency == "€"))
+        {
             on_trio(Trio::Price, input_num(l, v, 3));
         }
     }
@@ -302,7 +366,10 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 };
                 coords.set(Some(c));
                 let wanted = store.vehicle_fuels(&vehicle.get_untracked());
-                let (addr, found) = futures::join!(places::reverse_geocode(c), places::nearby(c, NEARBY_LIMIT, &wanted));
+                let (addr, found) = futures::join!(
+                    places::reverse_geocode(c),
+                    places::nearby(c, NEARBY_LIMIT, &wanted)
+                );
                 if address.get_untracked().is_empty()
                     && let Ok(Some(a)) = addr
                 {
@@ -326,7 +393,10 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 match found {
                     Ok(f) => {
                         nearby_place.set(None);
-                        nearby.set(Some((f.0, history.with_value(|all| with_own_names(f.1, all)))));
+                        nearby.set(Some((
+                            f.0,
+                            history.with_value(|all| with_own_names(f.1, all)),
+                        )));
                     }
                     Err(e) => ui.error(format!("{} ({e})", t.nearby_failed)),
                 }
@@ -349,7 +419,10 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 Ok(Some(point)) => match places::nearby(point, NEARBY_LIMIT, &wanted).await {
                     Ok(found) => {
                         nearby_place.set(Some(q.clone()));
-                        nearby.set(Some((found.0, history.with_value(|all| with_own_names(found.1, all)))));
+                        nearby.set(Some((
+                            found.0,
+                            history.with_value(|all| with_own_names(found.1, all)),
+                        )));
                     }
                     Err(e) => ui.error(format!("{} ({e})", t.nearby_failed)),
                 },
@@ -429,7 +502,11 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             return fail(t.err_date);
         }
         let o = parse_num(&odo.get_untracked()).filter(|v| *v >= 0.0);
-        let tr = if trip_explicit.get_untracked() { parse_num(&trip.get_untracked()).filter(|v| *v > 0.0) } else { None };
+        let tr = if trip_explicit.get_untracked() {
+            parse_num(&trip.get_untracked()).filter(|v| *v > 0.0)
+        } else {
+            None
+        };
         if o.is_none() && tr.is_none() {
             return fail(t.err_odometer);
         }
@@ -441,7 +518,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             parse_num(&total.get_untracked()),
             parse_num(&paid.get_untracked()),
         );
-        if pr.is_none() && tot.is_none() && pd.is_none() {
+        if !from_can.get_untracked() && pr.is_none() && tot.is_none() && pd.is_none() {
             return fail(t.err_amount);
         }
         let (prev, next) = neighbors.get_untracked();
@@ -458,7 +535,12 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             return;
         }
         let text = |s: RwSignal<String>| s.get_untracked().trim().to_string();
-        let (lat, lng) = coords.get_untracked().unzip();
+        let home = from_can.get_untracked();
+        let (lat, lng) = if home {
+            (None, None)
+        } else {
+            coords.get_untracked().unzip()
+        };
         let v = vehicle.get_untracked();
         store.save_record(Record {
             id: rec_id.clone(),
@@ -472,9 +554,10 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             paid: pd.filter(|p| Some(*p) != tot),
             full: full.get_untracked(),
             missed_previous: missed.get_untracked(),
+            from_can: home,
             fuel: text(fuel),
-            station: text(station),
-            address: text(address),
+            station: if home { String::new() } else { text(station) },
+            address: if home { String::new() } else { text(address) },
             lat,
             lng,
             notes: notes.get_untracked().trim().to_string(),
@@ -519,19 +602,31 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
         let e = preview.get()?;
         let (prev, _) = neighbors.get();
         let trip_line = e.trip.zip(prev).map(|(tr, p)| {
-            fill(t.preview_trip, &[("km", &num(l, tr, 0)), ("date", &format::short_date(l, &p.date))])
+            fill(
+                t.preview_trip,
+                &[
+                    ("km", &num(l, tr, 0)),
+                    ("date", &format::short_date(l, &p.date)),
+                ],
+            )
         });
         let state_line = match (e.state, &e.seg) {
             (SegState::Ok, Some(sg)) => fill(
                 t.preview_cons,
-                &[("v", &num(l, sg.cons, 2)), ("km", &num(l, sg.dist, 0)), ("c", &money(l, &cur, sg.cost / sg.dist * 100.0, 2))],
+                &[
+                    ("v", &num(l, sg.cons, 2)),
+                    ("km", &num(l, sg.dist, 0)),
+                    ("c", &money(l, &cur, sg.cost / sg.dist * 100.0, 2)),
+                ],
             ),
             (SegState::Start, _) => t.state_start.to_string(),
             (SegState::Partial, _) => t.state_partial.to_string(),
             (SegState::NoStart, _) => t.state_nostart.to_string(),
             _ => t.state_invalid.to_string(),
         };
-        let unit = e.unit_price.map(|p| fill(t.preview_unit_price, &[("v", &money(l, &cur, p, 3))]));
+        let unit = e
+            .unit_price
+            .map(|p| fill(t.preview_unit_price, &[("v", &money(l, &cur, p, 3))]));
         Some(view! {
             <div class=if e.state == SegState::Invalid { "preview warn" } else { "preview" }>
                 {trip_line.map(|s| view! { <div>{s}</div> })}
@@ -576,6 +671,19 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
             <form class="card form" on:submit=submit.clone() novalidate>
                 <h2>{if editing { t.edit_fillup } else { t.new_fillup }}</h2>
                 {vehicle_field}
+                <label class="switch">
+                    <input
+                        type="checkbox"
+                        prop:checked=move || from_can.get()
+                        on:change=move |ev| {
+                            from_can.set(event_target_checked(&ev));
+                            station_fuels.set(Vec::new());
+                            nearby.set(None);
+                        }
+                    />
+                    <span>{t.from_can}</span>
+                </label>
+                {move || from_can.get().then(|| view! { <p class="hint">{store.t().from_can_hint}</p> })}
                 <div class="grid2">
                     <label class="field">
                         <span>{t.date}</span>
@@ -628,7 +736,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                     {trio_input(Trio::Price, price, format!("{} ({cur}/L)", t.price))}
                     {trio_input(Trio::Total, total, format!("{} ({cur})", t.total))}
                 </div>
-                <p class="hint">{t.trio_hint}</p>
+                {move || (!from_can.get()).then(|| view! { <p class="hint">{store.t().trio_hint}</p> })}
                 <label class="field">
                     <span>{t.paid}" ("{cur}") "<em>{t.optional}</em></span>
                     <input
@@ -659,6 +767,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                 </div>
                 <p class="hint">{t.full_hint}</p>
                 {preview_view}
+                <div style=move || if from_can.get() { "display: none" } else { "display: contents" }>
                 <label class="field">
                     <span>{t.station}</span>
                     <div class="input-row">
@@ -724,6 +833,7 @@ pub fn RecordForm(#[prop(optional, into)] id: Option<String>) -> impl IntoView {
                             }
                         })
                 }}
+                </div>
                 <div class="field">
                     <span>{t.fuel}</span>
                     <div class="chips wrap">
